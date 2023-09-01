@@ -1,0 +1,61 @@
+---
+title: "Data 621 Homework 1"
+author: "Critical Thinking Group 3"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r include=FALSE}
+library(tidyverse)
+
+training_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-training-data.csv")
+test_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-evaluation-data.csv")
+````
+
+### Exploring the MoneyBall game statistics from 1871 to 2006 [Made Up name for team- Gators? ]|DATA EXPLORATION 
+### Preparing the game stats data set for regressions |DATA PREPARATION
+### Selecting the predictor values for our model| BUILD MODELS 
+### The final model's SELECT MODELs
+
+
+[Internal notes:
+Hi! Wanted to play around with the data set to get a feel for our next HW. If there are thoughts that may be included in the final version of the HW; It will not be surrounded by brackets [].-VH
+]
+
+
+### Appendix
+
+```{r}
+#Let's review our training set and if the training set needs updates before its process
+summary(training_set)
+
+#See the number of NAs per columns. Noticed Batters hit per pitch has the highest 
+colSums(is.na(training_set))
+
+#Visually checking for a positive linear trend with a singular predictor value
+#It's positive but there's a large grouping around 500
+g<-ggplot(training_set,aes(x=TEAM_BATTING_BB,y=TARGET_WINS))+geom_point()
+
+#[It's not mentioned the way the data set was collected so we cannot fill NAs as zeros. We can remove all NAs which shrinks our data set to 191. Removing columns w/ Na may removed predictors with the best influence on the Wins of this team ]
+
+#Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
+train.clean<-na.omit(training_set)
+
+
+#checking the summary of our clean data set
+summary(train.clean)
+
+#[We can use the step() to find predictors instead as it's r version of the stepwise algorithm instead of the manually creating three models but we can also come up for the journey]
+
+
+````
+
+
+
