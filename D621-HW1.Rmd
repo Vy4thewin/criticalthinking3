@@ -12,7 +12,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r include=FALSE}
+```{r message=FALSE, include=FALSE}
 library(tidyverse)
 library(ggpubr)
 
@@ -20,29 +20,52 @@ training_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthin
 test_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-evaluation-data.csv")
 ```
 
-### Exploring the MoneyBall game statistics from 1871 to 2006 |DATA EXPLORATION 
+### Introduction of the MoneyBall game statistics from 1871 to 2006
 
+For this analysis, the task assigned is when the next big win for the team based on their historical data. Let's review their statistical performance. The training data set was provided below for this exploration.
+
+#### Data Exploration 
+
+The initial review of the data set, the team saw on average 80 wins in a season. Their most prolific season saw 146 wins. One path of preemptive checks on normality is to view the binomial distribution of the team's wins. 
+
+The wins distribution appears normally distributed, which is a good candidate for a linear regression model. There is a slight dip in density around 70 wins, which could reveal a issue in the unprocessed data set. Let's review possible predictors relationship with the team's wins
 
 ```{r include=FALSE}
 #Let's review our training set and if the training set needs updates before its process
 summary(training_set)
 
-#See the number of NAs per columns. Noticed Batters hit per pitch has the highest 
-colSums(is.na(training_set))
+#review distribution of the response variable, see if not bi-modal 
+ggplot(data=training_set,aes(x=TARGET_WINS))+geom_density()+theme_classic()
+```
 
+
+Two possible predictor values where selected for visualization of their relationship with the number of wins. The Walks by Batter and the Home runs by Batter. There is a flag of concern with both variables as it appears both predictor create a narrow linear tunnel. This can be influence by another variables. 
+
+```{r}
 #Visually checking for a positive linear trend with a singular predictor value
-g<-ggplot(training_set,aes(x=TEAM_BATTING_BB,y=TARGET_WINS))+geom_point()+theme_classic()
-# ploting the wins vs home runs
-g1<-ggplot(training_set,aes(x=TEAM_BATTING_HR,y=TARGET_WINS))+geom_point()+theme_classic()
+g<-ggplot(training_set,aes(x=TEAM_BATTING_BB,y=TARGET_WINS))+geom_point()+labs(title = "Teams Wins vs Walks by Batter",x="Walks by Batter",y="# of wins")+theme_classic()
+
+# plotting the wins vs home runs
+g1<-ggplot(training_set,aes(x=TEAM_BATTING_HR,y=TARGET_WINS))+geom_point()+labs(title = "Teams Wins vs Home runs by Batter",x="# of Homeruns",y="# of wins")+theme_classic()
 
 #Viewing multiple graphs with a selected predictor variable and its response (wins)
 ggarrange(g,g1,ncol = 2,nrow = 1)
 
 ```
 
+When we further examine the data set, we noticed a few columns have a large amount of NA values. The largest unaccounted amount of values fall with batters hit by the pitchers. We do not have insight from the survey team if these NAs reflected no values recorded or a human imputation error. This will have to be sorted for the analysis. 
 
-### Preparing the game stats data set for regressions |DATA PREPARATION
+```{r include=FALSE}
+#See the number of NAs per columns. Noticed Batters hit per pitch has the highest count
+colSums(is.na(training_set))
 
+```
+
+
+### Preparing the game stats data set for regression |
+#### Data preparation
+
+From the previous part, there is no notation that NAs reflect zeros for the data set. For the most accurate representation for the data set, NAs will be excluded from the data set. "Train.clean" data was reduced by 91% with the NA exclusions; however, the model will create a stable prediction.
 
 ```{r include=FALSE}
 #Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
@@ -51,12 +74,42 @@ train.clean<-na.omit(training_set)
 #remove the index column as it does not a have effect in the data
 train.clean<-train.clean%>%select(-c(INDEX))
 
-#optional, remove hbp column and remove NAs, Only if score is <significant. Data set
+#see data set reduction
+c<-191
+c<-((c-2200)/2200)*100
+sprintf("The newest data set was reduced by %.02f%% from the original",c)
+summary(train.clean)
 
-#optional, scale the training set so its easier for the system to process the data in the regression model
+```
+
+
+Although our observations was significantly reduced, it did open the possibility of new predictors. The MLB^[https://www.mlb.com/glossary/advanced-stats] and other baseball fanatic sites^[http://hosted.stats.com/mlb/stats.asp?file=glossary] provides a list of advanced statistics which expands the amount of available predictors. The new predictors introduced to clean data set are Strikeouts to walk "STW Ratio", Power Speed Number "PSN", and Total Bases.
+
+*New Baseball Variables
+  +STW Ratio: The times a pitcher strikeouts over the times a batter walks to first base
+  +Power Speed Number: The player's power and speed 
+  +Total Bases: Number of bases gain by batter by hits
+
+
+```{r include=FALSE}
+# Found some baseball formulas here to add onto our analysis
+#STW= pitchers strikeouts/ walks by batter
+train.clean<-train.clean %>% mutate(STW_Ratio=TEAM_PITCHING_SO/TEAM_BATTING_BB)
+
+#Power Speed Number = (HR x SB x 2) divided by (HR + SB)
+train.clean<-train.clean%>%mutate(PSN=(TEAM_BATTING_HR*TEAM_BASERUN_SB*2)/(TEAM_BATTING_HR+TEAM_BASERUN_SB))
+
+#total bases=[H + 2B + (2 X 3B) + (3 X HR)].
+train.clean<-train.clean%>%mutate(TB=TEAM_BATTING_H+TEAM_BATTING_2B+(2*TEAM_BATTING_3B)+(3*TEAM_BATTING_HR))
+
+#review new columns
+head(train.clean,3)
+```
+
+Let's scale our new training set before our analysis as the new variables are not on the same scale. Now, the training set is ready to be fitted!
+```{r}
+#scale the training set so its easier for the system to process the data in the regression model
 train.clean<-scale(train.clean)
-
-#
 
 ```
 
@@ -65,59 +118,11 @@ train.clean<-scale(train.clean)
 
 ### The final model's predicted highest number of wins| SELECT MODELs
 
-```{r}
-
-#predict (winning lm, new data= test data)
-#predicts, prediction will show a table of predicted wins. max(predict)-> highest predicted wins of moneyball
-
-#CI on the predictions. 95% confidenece would be nice
-
-
-#plot of the predicts of LM()
-
-#normality of the winning model [It should pass linearity]
-
-
-
-
-```
-
 
 ### Appendix
 
 ```{r}
-#All Code will be display here
-library(tidyverse)
-library(ggpubr)
-
-training_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-training-data.csv")
-test_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-evaluation-data.csv")
-
-
-#Let's review our training set and if the training set needs updates before its process
-summary(training_set)
-
-#See the number of NAs per columns. Noticed Batters hit per pitch has the highest 
-colSums(is.na(training_set))
-
-#Visually checking for a positive linear trend with a singular predictor value
-g<-ggplot(training_set,aes(x=TEAM_BATTING_BB,y=TARGET_WINS))+geom_point()+theme_classic()
-# ploting the wins vs home runs
-g1<-ggplot(training_set,aes(x=TEAM_BATTING_HR,y=TARGET_WINS))+geom_point()+theme_classic()
-
-#Viewing multiple graphs with a selected predictor variable and its response (wins)
-ggarrange(g,g1,ncol = 2,nrow = 1)
-
-#Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
-train.clean<-na.omit(training_set)
-
-#remove the index column as it does not a have effect in the data
-train.clean<-train.clean%>%select(-c(INDEX))
-
-#optional, remove hbp column and remove NAs, Only if score is <significant. Data set
-
-#optional, scale the training set so its easier for the system to process the data in the regression model
-train.clean<-scale(train.clean)
+#All Code will be display here [will update to include all code in this block below]
 
 ````
 
