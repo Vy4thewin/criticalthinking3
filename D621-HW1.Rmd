@@ -109,12 +109,43 @@ head(train.clean,3)
 Let's scale our new training set before our analysis as the new variables are not on the same scale. Now, the training set is ready to be fitted!
 ```{r}
 #scale the training set so its easier for the system to process the data in the regression model
-train.clean<-scale(train.clean)
-
+train.clean <-scale(train.clean)
+train.clean <- data.frame(train.clean)
 ```
+
 
 ### Selecting the predictor values for our model| BUILD MODELS 
 
+Now we're going to create three linear models with distinct predictor values, and compare the results. For our first model, we're going assign see the affects of all the stats against *TARGET_WINS* 
+```{r}
+#first model using all baseball stats
+fit1 = lm(TARGET_WINS ~., data = train.clean)
+summary(fit1)
+```
+
+The coefficients for the two statistical signficant variables - *TEAM_FIELDING_E* and *TEAM_FIELDING_DP* - are negative. This means for every increase in this stat, the lower the less wins. This seems accurate for the variable *TEAM_FIELDING_E* because the more error a team makes, the more chances it gives the other team to score or take a base. I'm not sure why *TEAM_FIELDING_DP* would have a negative coefficient since the double play should be advantageous to a team and not the oponent. Overall this model, has the most predictive values and has the least statistically significant variable.
+
+------------------------------------------------------------------------------------------------------
+
+The second model will contain solely batting variables such as *TEAM_BATTING_H* and *TEAM_BATTING_2B*. Batting statistics can create more points and home runs, therefore increase the chances of a team to win. This can lead to a strong predictive.
+```{r}
+#second model with just batting variables
+fit2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BATTING_HBP, data = train.clean)
+summary(fit2)
+```
+
+All the statistical significant variables with the exception of TEAM_BATTING_SO has a positive coefficient. This is accruate because *TEAM_BATTING_H*, *TEAM_BATTING_HR*, and *TEAM_BATTING_BB* are all indication of the steal of a base, or a score against the oppossing team. It makes sense that that the higher these variables are, the higher chances for a win. In contrast, TEAM_BATTING_SO 0 which measures the strike outs by a team - indicates the lack of scoring and would therefore make sense for it to negatively affect winning. Overall this has less predictor values compared to model1 and also contains more significant values.
+
+-------------------------------------------------------------------------------------------
+
+The third model with contain only pitching and fielding stats. Outside of batting offense, pitching is important because it can limit the scoring of the opposing team. Similarly, the less Fielding Errors - which can give up scoring opportunities - the higher chances of winning. Fielding Double Plays - which is the ability to achieve two outs in a defensive play - can also increase the chances of a win. This model can also potentially give us a high winning percentage.
+```{r}
+#third model with pitching and fielding variables
+fit3 <- lm(TARGET_WINS ~ TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = train.clean)
+summary(fit3)
+```
+
+In comparison to the other models this has the most significant variables and is more parsimonious. *TEAM_PITCHING_H*, *TEAM_PITCHING_HR*, *TEAM_PITCHING_BB*, and *TEAM_PITCHING_SO* are all positive coefficients because they are crucial to a team's defense. The higher these statistics, the higher the chance for a team to win. 
 
 ### The final model's predicted highest number of wins| SELECT MODELs
 
