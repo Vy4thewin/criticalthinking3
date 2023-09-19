@@ -30,7 +30,6 @@ For this analysis, the task assigned is when the next big win for the team based
 #### Data Exploration 
 
 The initial review of the data set, the team saw on average 80 wins in a season. Their most prolific season saw 146 wins. One path of preemptive checks on normality is to view the binomial distribution of the team's wins. 
-
 The wins distribution appears normally distributed, which is a good candidate for a linear regression model. There is a slight dip in density around 70 wins, which could reveal a issue in the unprocessed data set. Let's review possible predictors relationship with the team's wins
 
 ```{r include=FALSE}
@@ -70,12 +69,12 @@ colSums(is.na(training_set))
 
 From the previous part, there is no notation that NAs reflect zeros for the data set. 
 
-There's two path for handling NAs. First path uses MICE to predicted the missing values in the data set. The first steps to to remove predictors that passed the threshold of randomness of missing values, as this method is under the assumption that values are missing at random. The two predictors "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have a large amount of missing values, which is a strong indication its NAs are not missing at random. It is best to remove the predictors before running the MICE model on the data set. After its removal, the new data set can run through the model and have its values predict.
+There's two path for handling NAs. First path uses MICE to predict the missing values in the data set. The first step is to remove predictors that passed the threshold of randomness of missing values, as this method is under the assumption that values are missing at random. The two predictors "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have a large amount of missing values, which is a strong indication its NAs are not missing at random. It is best to remove the predictors before running the MICE model on the data set. After its removal, the new data set can run through the model and have its values predict.
 
 The other method is complete removal of the NAs. This methods all NAs from the original data set with only rows that are complete. This method does include all predictors but greatly reduces the data set by 90%+. This is not ideal as the number of observations greatly influences the model's regression.
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-#Way 1| to handle NAs, Drop predictor HBP from the data set as missing and use MICE for imputation
+#Way 1| to handle NAs, Drop predictor HBP and CS from the data set as missing and use MICE for imputation
 #Let's select the lasso norm method for our imputation as its relates back to the week's reading
 train.c1<-training_set%>%select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS))
 train.c1<-complete(mice(train.c1,method = "lasso.norm",seed = 333))
@@ -167,18 +166,22 @@ fit1 = lm(TARGET_WINS ~., data = train_set)
 summary(fit1)
 ```
 
-The coefficients for the two statistical signficant variables - *TEAM_FIELDING_E* and *TEAM_FIELDING_DP* - are negative. This means for every increase in this stat, the lower the less wins. This seems accurate for the variable *TEAM_FIELDING_E* because the more error a team makes, the more chances it gives the other team to score or take a base. I'm not sure why *TEAM_FIELDING_DP* would have a negative coefficient since the double play should be advantageous to a team and not the oponent. Overall this model, has the most predictive values and has the least statistically significant variable.
+Looking at the coefficient numbers, we notice something odd. Batting variables that should theoretically have a positive effect on winning like *TEAM_BATTING_H*, *TEAM_BATTING_2B*, *TEAM_BATTING_3B*, and *TEAM_BATTING_HR* have a negative coefficient. This means for every increase in this stat, the lower the less wins - which is odd. We see the inverse for some variables. *TEAM_PITCHING_H* or hits allowed, a stat which has a negative impact on wins, has a positive coefficient. We suspect this is because of the effect of having all the predictor values together.
+
+This model has the most predictive values, contains 12 statistically significant variables, and has a low R squared value.
 
 ------------------------------------------------------------------------------------------------------
 
 The second model will contain solely batting variables such as *TEAM_BATTING_H* and *TEAM_BATTING_2B*. Batting statistics can create more points and home runs, therefore increase the chances of a team to win. This can lead to a strong predictive.
 ```{r}
 #second model with just batting variables
-fit2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BATTING_HBP, data = train_set)
+fit2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO, data = train_set)
 summary(fit2)
 ```
 
-All the statistical significant variables with the exception of TEAM_BATTING_SO has a positive coefficient. This is accruate because *TEAM_BATTING_H*, *TEAM_BATTING_HR*, and *TEAM_BATTING_BB* are all indication of the steal of a base, or a score against the oppossing team. It makes sense that that the higher these variables are, the higher chances for a win. In contrast, TEAM_BATTING_SO 0 which measures the strike outs by a team - indicates the lack of scoring and would therefore make sense for it to negatively affect winning. Overall this has less predictor values compared to model1 and also contains more significant values.
+Unlike the first model where some of the batting variables had negative coefficients, most of them are positive here - which matches the effect that they have on a game. 
+
+Overall this has less predictor values compared to model 1, is comprised mainly of statistically significant variables, but has a lower R squared compared to model 1
 
 -------------------------------------------------------------------------------------------
 
@@ -189,7 +192,9 @@ fit3 <- lm(TARGET_WINS ~ TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB +
 summary(fit3)
 ```
 
-In comparison to the other models this has the most significant variables and is more parsimonious. *TEAM_PITCHING_H*, *TEAM_PITCHING_HR*, *TEAM_PITCHING_BB*, and *TEAM_PITCHING_SO* are all positive coefficients because they are crucial to a team's defense. The higher these statistics, the higher the chance for a team to win. 
+The variables *TEAM_PITCHING_H*, *TEAM_PITCHING_HR*, *TEAM_PITCHING_BB* have  positive coefficients which makes sense given that they have a positive effect on wins. *TEAM_FIELDING_E* and *TEAM_PITCHING_SO* are detrimental to a game and so their coefficient is negative. It's odd that *TEAM_FIELDING_DP* is negative because they are a positive occurrence in a game.
+
+This model is comprised mostly of statistically variables, but has the lowest R squared compared to the other models.
 
 ### The final model's predicted highest number of wins| SELECT MODELs
 
