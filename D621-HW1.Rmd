@@ -8,8 +8,12 @@ output:
     highlight: github
 vignette: >
   %\VignetteIndexEntry{Vignette Title}
-  %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  markdown: 
+    wrap: 72
+  chunk_output_type: console
 ---
 
 ```{r message=FALSE, include=FALSE}
@@ -17,31 +21,139 @@ library(tidyverse)
 library(ggpubr)
 library(corrplot)
 library(mice)
+library(NHANES)
+library(naniar)
+library(GGally)
 
 
 training_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-training-data.csv")
 test_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-evaluation-data.csv")
 ```
 
-### Introduction of the MoneyBall game statistics from 1871 to 2006
+## Introduction of the MoneyBall game statistics from 1871 to 2006
 
-For this analysis, the task assigned is when the next big win for the team based on their historical data. Let's review their statistical performance. The training data set was provided below for this exploration.
+For this analysis a Multiple Linear Regression Model (MLR) will be
+built. The objective is to predict how many games are won, in a given
+season, based on baseball game event metrics. The baseball game events include batting, strikeouts, fielding, and
+pitching. Each variable can have a positive or a negative influence on the number of wins for the season. For more details on variables, see section **About the Dataset**.
 
-#### Data Exploration 
+The final report will include the following sections:  
+**1. Data Exploration:** high-level statistical information about the training data set. This includes, but is not limited to variable distributions, correlations, visualizations and completeness of the data. 
+  
+**2. Data Preparation:** describes steps and techniques used to transform the data.  
+  
+**3. Building models:** will report on several models, its accuracy, and steps taken to improve it.
+  
+**4. Model selection:** will outline the best model and why it was chosen among all the different alternatives.
+  
+  
+## 1. Data Exploration  
+For building linear regression models, data exploration is usually the first step. Its a best practice which allows scientists to find discrepancies in the dataset before diving into model building. Moreover, the data quality can be quantified and visualized. The results are then used to formulate the model-building approach.
+  
+  
+### 1.1 About the Dataset  
+  
+The provided dataset contains two files in CSV format. One for training the MLR model, and one for generating predictions.  
+  
+The following variables are found in the dataset:
 
-The initial review of the data set, the team saw on average 80 wins in a season. Their most prolific season saw 146 wins. One path of preemptive checks on normality is to view the binomial distribution of the team's wins. 
-The wins distribution appears normally distributed, which is a good candidate for a linear regression model. There is a slight dip in density around 70 wins, which could reveal a issue in the unprocessed data set. Let's review possible predictors relationship with the team's wins
+Variable Name | Definition | Theoretical Effect
+------------- | ------------- | -------------
+INDEX | Identification Variable (do not use) |  
+TARGET_WINS | Number of wins | Response variable
+TEAM_BATTING_H | Base hits by batters (1B,2B, 3B, HR) | Positive Impact on Wins
+TEAM_BATTING_2B | Doubles by batters (2B) | Positive Impact on Wins
+TEAM_BATTING_3B | Triples by batters (3B) | Positive Impact on Wins
+TEAM_BATTING_HR | Homeruns by batters (4B) | Positive Impact on Wins
+TEAM_BATTING_BB | Walks by batters | Positive Impact on Wins
+TEAM_BATTING_HBP | Batters hit by pitch (get a free base) | Positive Impact on Wins
+TEAM_BATTING_SO | Strikeouts by batters | Negative Impact on Wins
+TEAM_BASERUN_SB | Stolen bases | Positive Impact on Wins
+TEAM_BASERUN_CS | Caught stealing | Negative Impact on Wins
+TEAM_FIELDING_E | Errors | Negative Impact on Wins
+TEAM_FIELDING_DP | Double Plays | Positive Impact on Wins
+TEAM_PITCHING_BB | Walks allowed | Negative Impact on Wins
+TEAM_PITCHING_H | Hits allowed | Negative Impact on Wins
+TEAM_PITCHING_HR | Homeruns allowed | Negative Impact on Wins
+TEAM_PITCHING_SO | Strikeouts by pitchers | Positive Impact on Wins
 
-```{r include=FALSE}
-#Let's review our training set and if the training set needs updates before its process
+### 1.2 Descriptive Statistical Analysis 
+
+On average, teams saw 80 wins in a given season. The most prolific season saw a high of 146, whereas the lowest saw a value of 0. One path of preemptive checks on normality is to view the binomial distribution of the response variable. The distribution for TARGET_WINS, the response variable for this analysis, appears to be normally distributed. It can be inferred that it is a good candidate for a linear regression model. It should be noted there is a slight dip in density distribution around 70 wins. This could reveal an issue with the unprocessed data set.
+  
+  
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+require(gridExtra)
+plot1 <- ggplot() + # Boxplot of TARGET_WINS
+  geom_boxplot(aes(y = training_set$TARGET_WINS)) + 
+  scale_x_discrete( ) +
+  labs(title = "Dist. of Game Wins per Season",
+       y = "Number of Wins")
+
+# compute mean TARTGET_WINS
+mean_tw <- training_set %>% 
+  pull(TARGET_WINS) %>% 
+  mean() %>%
+  signif(6)
+
+plot2 <- ggplot( #review distribution of the response variable, see if not bi-modal 
+  data=training_set, aes(x=TARGET_WINS))+
+  geom_density()+
+  labs(y = "Density",
+       x = "Number of Wins")+
+  geom_vline(xintercept=mean_tw, size=1.2, color="red")
+
+
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+  
+### 1.3 Data Wrangling Pre-inspection:
+```{r}
 summary(training_set)
+```
+  
+#### 1.3.1 Inspecting for null values:  
+  
+Examining the data set, it was found that several variables have a
+large amount of NA values. The largest unaccounted amount of values fall
+with batters hit by the pitchers. We do not have insight from the survey
+team if these NAs reflected no values recorded or a human imputation
+error. This will have to be sorted for the analysis. 
+  
+1. Are there missing values in the dataset?
+```{r, echo=FALSE}
+any_na(training_set)
+```
 
-#review distribution of the response variable, see if not bi-modal 
-ggplot(data=training_set,aes(x=TARGET_WINS))+geom_density()+theme_classic()
+2. How many? What is the proportion of missing values?
+```{r, echo=FALSE}
+n_miss(training_set)
+prop_miss(training_set)
+```
+
+3. Which variables are affected?
+```{r, echo=FALSE}
+training_set %>% is.na() %>% colSums()
+```
+
+4. Which variables contain the most missing data?
+```{r, echo=FALSE}
+training_set %>% is.na() %>% colSums()
+gg_miss_var(training_set)
 ```
 
 
-Two possible predictor values where selected for visualization of their relationship with the number of wins. The Walks by Batter and the Home runs by Batter. There is a flag of concern with both variables as it appears both predictor create a narrow linear tunnel. This can be influence by another variables. 
+```{r include=FALSE}
+#See the number of NAs per columns. Noticed Batters hit per pitch has the highest count
+colSums(is.na(training_set))
+
+```
+
+### 1.4 Investigating Relationships
+
+Two possible predictor values were selected to plot against TARGET_WINS. TEAM_BATTING_BB (Walks by Batter), and TEAM_BATTING_HR (Home
+runs by Batter). There is concern for both variables as they do not appear to have a linear relationship with TARGET_WINS. Ultimately, this can be influenced by another variables.??
 
 ```{r}
 #Visually checking for a positive linear trend with a singular predictor value
@@ -55,23 +167,17 @@ ggarrange(g,g1,ncol = 2,nrow = 1)
 
 ```
 
-When we further examine the data set, we noticed a few columns have a large amount of NA values. The largest unaccounted amount of values fall with batters hit by the pitchers. We do not have insight from the survey team if these NAs reflected no values recorded or a human imputation error. This will have to be sorted for the analysis. 
+## 2. Data preparation
 
-```{r include=FALSE}
-#See the number of NAs per columns. Noticed Batters hit per pitch has the highest count
-colSums(is.na(training_set))
+From the previous section, there is no indication that NAs reflect zeros in
+the dataset. As such, they will be assumed to be missing values. Missing values can be handled with two common techniques.
 
-```
+The first technique utilizes imputation to assign values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
+missing values in the dataset. It involves removing predictors that pass a given threshold of randomness. This method assumes that values are missing at random. During the data exploration stage, it was found that variables "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have the highest count of missing values. This is a strong indication that its NAs are not
+missing at random. It is best to remove the predictors before running
+the MICE model on the data set. After its removal, a model can be trained.
 
-
-### Preparing the game stats data set for regression |
-#### Data preparation
-
-From the previous part, there is no notation that NAs reflect zeros for the data set. 
-
-There's two path for handling NAs. First path uses MICE to predict the missing values in the data set. The first step is to remove predictors that passed the threshold of randomness of missing values, as this method is under the assumption that values are missing at random. The two predictors "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have a large amount of missing values, which is a strong indication its NAs are not missing at random. It is best to remove the predictors before running the MICE model on the data set. After its removal, the new data set can run through the model and have its values predict.
-
-The other method is complete removal of the NAs. This methods all NAs from the original data set with only rows that are complete. This method does include all predictors but greatly reduces the data set by 90%+. This is not ideal as the number of observations greatly influences the model's regression.
+The alternative path consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more then 90% of the dataset. This technique is not ideal as the number of observations greatly influences the model's regression.
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 #Way 1| to handle NAs, Drop predictor HBP and CS from the data set as missing and use MICE for imputation
@@ -103,13 +209,19 @@ corrplot(cor(train.clean[,2:14]),method = "number",type="lower", tl.srt = .71,nu
 
 ```
 
+Although our observations was significantly reduced, it did open the
+possibility of new predictors. The MLB[^1] and other baseball fanatic
+sites[^2] provides a list of advanced statistics which expands the
+amount of available predictors. The new predictors introduced to clean
+data set are Strikeouts to walk "STW Ratio" and Total Bases.
 
-Although our observations was significantly reduced, it did open the possibility of new predictors. The MLB^[https://www.mlb.com/glossary/advanced-stats] and other baseball fanatic sites^[http://hosted.stats.com/mlb/stats.asp?file=glossary] provides a list of advanced statistics which expands the amount of available predictors. The new predictors introduced to clean data set are Strikeouts to walk "STW Ratio" and Total Bases.
+[^1]: <https://www.mlb.com/glossary/advanced-stats>
 
-*New Baseball Variables
-  +STW Ratio: The times a pitcher strikeouts over the times a batter walks to first base
-  +Total Bases: Number of bases gain by batter by hits
+[^2]: <http://hosted.stats.com/mlb/stats.asp?file=glossary>
 
+\*New Baseball Variables +STW Ratio: The times a pitcher strikeouts over
+the times a batter walks to first base +Total Bases: Number of bases
+gain by batter by hits
 
 ```{r include=FALSE}
 # Found some baseball formulas here to add onto our analysis
@@ -126,7 +238,10 @@ train.clean<-na.omit(train.clean)
 head(train.clean,3)
 ```
 
-Let's scale our new training set before our analysis as the new variables are not on the same scale. Now, the training set is ready to be fitted!
+Let's scale our new training set before our analysis as the new
+variables are not on the same scale. Now, the training set is ready to
+be fitted!
+
 ```{r warning=FALSE, include=FALSE}
 #see any possible predictors for skeweness and apply transformations before fitting 
 g1<-ggplot(data=train.clean,aes(x=TEAM_BATTING_H))+geom_density()+theme_classic()
@@ -156,55 +271,83 @@ train_set<-scale(train.clean)
 train_set <- data.frame(train_set)
 ```
 
+## 3. Selecting the predictor values for our model\| BUILD MODELS
 
-### Selecting the predictor values for our model| BUILD MODELS 
+Now we're going to create three linear models with distinct predictor
+values, and compare the results. For our first model, we're going assign
+see the affects of all the stats against *TARGET_WINS*
 
-Now we're going to create three linear models with distinct predictor values, and compare the results. For our first model, we're going assign see the affects of all the stats against *TARGET_WINS* 
 ```{r}
 #first model using all baseball stats
 fit1 = lm(TARGET_WINS ~., data = train_set)
 summary(fit1)
 ```
 
-Looking at the coefficient numbers, we notice something odd. Batting variables that should theoretically have a positive effect on winning like *TEAM_BATTING_H*, *TEAM_BATTING_2B*, *TEAM_BATTING_3B*, and *TEAM_BATTING_HR* have a negative coefficient. This means for every increase in this stat, the lower the less wins - which is odd. We see the inverse for some variables. *TEAM_PITCHING_H* or hits allowed, a stat which has a negative impact on wins, has a positive coefficient. We suspect this is because of the effect of having all the predictor values together.
+Looking at the coefficient numbers, we notice something odd. Batting
+variables that should theoretically have a positive effect on winning
+like *TEAM_BATTING_H*, *TEAM_BATTING_2B*, *TEAM_BATTING_3B*, and
+*TEAM_BATTING_HR* have a negative coefficient. This means for every
+increase in this stat, the lower the less wins - which is odd. We see
+the inverse for some variables. *TEAM_PITCHING_H* or hits allowed, a
+stat which has a negative impact on wins, has a positive coefficient. We
+suspect this is because of the effect of having all the predictor values
+together.
 
-This model has the most predictive values, contains 12 statistically significant variables, and has a low R squared value.
+This model has the most predictive values, contains 12 statistically
+significant variables, and has a low R squared value.
 
-------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------
 
-The second model will contain solely batting variables such as *TEAM_BATTING_H* and *TEAM_BATTING_2B*. Batting statistics can create more points and home runs, therefore increase the chances of a team to win. This can lead to a strong predictive.
+The second model will contain solely batting variables such as
+*TEAM_BATTING_H* and *TEAM_BATTING_2B*. Batting statistics can create
+more points and home runs, therefore increase the chances of a team to
+win. This can lead to a strong predictive.
+
 ```{r}
 #second model with just batting variables
 fit2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO, data = train_set)
 summary(fit2)
 ```
 
-Unlike the first model where some of the batting variables had negative coefficients, most of them are positive here - which matches the effect that they have on a game. 
+Unlike the first model where some of the batting variables had negative
+coefficients, most of them are positive here - which matches the effect
+that they have on a game.
 
-Overall this has less predictor values compared to model 1, is comprised mainly of statistically significant variables, but has a lower R squared compared to model 1
+Overall this has less predictor values compared to model 1, is comprised
+mainly of statistically significant variables, but has a lower R squared
+compared to model 1
 
--------------------------------------------------------------------------------------------
+------------------------------------------------------------------------
 
-The third model with contain only pitching and fielding stats. Outside of batting offense, pitching is important because it can limit the scoring of the opposing team. Similarly, the less Fielding Errors - which can give up scoring opportunities - the higher chances of winning. Fielding Double Plays - which is the ability to achieve two outs in a defensive play - can also increase the chances of a win. This model can also potentially give us a high winning percentage.
+The third model with contain only pitching and fielding stats. Outside
+of batting offense, pitching is important because it can limit the
+scoring of the opposing team. Similarly, the less Fielding Errors -
+which can give up scoring opportunities - the higher chances of winning.
+Fielding Double Plays - which is the ability to achieve two outs in a
+defensive play - can also increase the chances of a win. This model can
+also potentially give us a high winning percentage.
+
 ```{r}
 #third model with pitching and fielding variables
 fit3 <- lm(TARGET_WINS ~ TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = train_set)
 summary(fit3)
 ```
 
-The variables *TEAM_PITCHING_H*, *TEAM_PITCHING_HR*, *TEAM_PITCHING_BB* have  positive coefficients which makes sense given that they have a positive effect on wins. *TEAM_FIELDING_E* and *TEAM_PITCHING_SO* are detrimental to a game and so their coefficient is negative. It's odd that *TEAM_FIELDING_DP* is negative because they are a positive occurrence in a game.
+The variables *TEAM_PITCHING_H*, *TEAM_PITCHING_HR*, *TEAM_PITCHING_BB*
+have positive coefficients which makes sense given that they have a
+positive effect on wins. *TEAM_FIELDING_E* and *TEAM_PITCHING_SO* are
+detrimental to a game and so their coefficient is negative. It's odd
+that *TEAM_FIELDING_DP* is negative because they are a positive
+occurrence in a game.
 
-This model is comprised mostly of statistically variables, but has the lowest R squared compared to the other models.
+This model is comprised mostly of statistically variables, but has the
+lowest R squared compared to the other models.
 
-### The final model's predicted highest number of wins| SELECT MODELs
+## 4. Model Selection
 
+## Appendix
 
-### Appendix
+\`\`\`{r} #All Code will be display here [will update to include all
+code in this block below]
 
-```{r}
-#All Code will be display here [will update to include all code in this block below]
-
-````
-
-
-
+\`\`\`\`
