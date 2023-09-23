@@ -79,7 +79,7 @@ TEAM_PITCHING_SO | Strikeouts by pitchers | Positive Impact on Wins
 
 ### 1.2 Descriptive Statistical Analysis 
 
-On average, teams saw 80 wins in a given season. The most prolific season saw a high of 146, whereas the lowest saw a value of 0. One path of preemptive checks on normality is to view the binomial distribution of the response variable. The distribution for TARGET_WINS, the response variable for this analysis, appears to be normally distributed. It can be inferred that it is a good candidate for a linear regression model. It should be noted there is a slight dip in density distribution around 70 wins. This could reveal an issue with the unprocessed data set.
+On average, teams saw 80 wins in a given season. The most prolific season saw a high of 146, whereas the least saw a value of 0. One path of preemptive checks on normality is to view the binomial distribution of the response variable. The distribution for TARGET_WINS, the response variable for this analysis, appears to be normally distributed. It can be inferred that it is a good candidate for a linear regression model. It should be noted there is a slight dip in density distribution around 70 wins. This could reveal an issue with the unprocessed data set.
   
   
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
@@ -115,10 +115,10 @@ summary(training_set)
   
 #### 1.3.1 Inspecting for null values:  
   
-Examining the data set, it was found that several variables have a
-large amount of NA values. The largest unaccounted amount of values fall
+While examining the dataset it was found that several variables have a
+large count of NA values. The largest unaccounted amount of values fall
 with batters hit by the pitchers. We do not have insight from the survey
-team if these NAs reflected no values recorded or a human imputation
+team to deduce if these NAs reflect no values recorded or a human imputation
 error. This will have to be sorted for the analysis. 
   
 1. Are there missing values in the dataset?
@@ -155,7 +155,7 @@ colSums(is.na(training_set))
 Two possible predictor values were selected to plot against TARGET_WINS. TEAM_BATTING_BB (Walks by Batter), and TEAM_BATTING_HR (Home
 runs by Batter). There is concern for both variables as they do not appear to have a linear relationship with TARGET_WINS. Ultimately, this can be influenced by another variables.??
 
-```{r}
+```{r, echo=FALSE}
 #Visually checking for a positive linear trend with a singular predictor value
 g<-ggplot(training_set,aes(x=TEAM_BATTING_BB,y=TARGET_WINS))+geom_point()+labs(title = "Teams Wins vs Walks by Batter",x="Walks by Batter",y="# of wins")+theme_classic()
 
@@ -172,24 +172,33 @@ ggarrange(g,g1,ncol = 2,nrow = 1)
 From the previous section, there is no indication that NAs reflect zeros in
 the dataset. As such, they will be assumed to be missing values. Missing values can be handled with two common techniques.
 
-The first technique utilizes imputation to assign values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
+The first technique consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more than 90% of the dataset. A reduction from 2276 to 191 data points. This technique is not ideal as the reduced number of observations can negatively influence the model's regression. However, a model with this technique will be explored. 
+
+The alternative path consist utilizes imputation to assign values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
 missing values in the dataset. It involves removing predictors that pass a given threshold of randomness. This method assumes that values are missing at random. During the data exploration stage, it was found that variables "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have the highest count of missing values. This is a strong indication that its NAs are not
 missing at random. It is best to remove the predictors before running
 the MICE model on the data set. After its removal, a model can be trained.
 
-The alternative path consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more then 90% of the dataset. This technique is not ideal as the number of observations greatly influences the model's regression.
 
+### 2.1 Technique #1: Removing Rows With Any NAs
+```{r}
+#Technique #1: removing rows with any NAs
+training_set_na_rem <- na.omit(training_set)
+
+summary(training_set_na_rem)
+```
+  
+### 2.2 Technique #2: Drop HBP and CS predictors, and use MICE imputation
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-#Way 1| to handle NAs, Drop predictor HBP and CS from the data set as missing and use MICE for imputation
-#Let's select the lasso norm method for our imputation as its relates back to the week's reading
+#Technique #2: Drop predictors HBP and CS and use MICE imputation
 train.c1<-training_set%>%select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS))
-train.c1<-complete(mice(train.c1,method = "lasso.norm",seed = 333))
 
+train.c1<-complete(mice(train.c1,method = "lasso.norm",seed = 333))
 
 #Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
 train.c2<-na.omit(training_set)
 
-#remove the index column as it does not a have effect in the data
+#remove the index column as it does not a have effect on the data
 train.c2<-train.c2%>%select(-c(INDEX))
 
 
@@ -205,11 +214,9 @@ summary(train.clean)
 
 #Seeing the correlation between non-NA predictors to indicate mutli-collinearity 
 corrplot(cor(train.clean[,2:14]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
-
-
 ```
 
-Although our observations was significantly reduced, it did open the
+Although our observations were significantly reduced, it did open the
 possibility of new predictors. The MLB[^1] and other baseball fanatic
 sites[^2] provides a list of advanced statistics which expands the
 amount of available predictors. The new predictors introduced to clean
@@ -271,7 +278,7 @@ train_set<-scale(train.clean)
 train_set <- data.frame(train_set)
 ```
 
-## 3. Selecting the predictor values for our model\| BUILD MODELS
+## 3. Building Models
 
 Now we're going to create three linear models with distinct predictor
 values, and compare the results. For our first model, we're going assign
