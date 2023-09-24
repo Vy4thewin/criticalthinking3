@@ -174,7 +174,7 @@ the dataset. As such, they will be assumed to be missing values. Missing values 
 
 The first technique consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more than 90% of the dataset. A reduction from 2276 to 191 data points. This technique is not ideal as the reduced number of observations can negatively influence the model's regression. However, a model with this technique will be explored. 
 
-The alternative path consist utilizes imputation to assign values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
+The alternative path consist of utilizing imputation to assign synthetic values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
 missing values in the dataset. It involves removing predictors that pass a given threshold of randomness. This method assumes that values are missing at random. 
   
 During the data exploration stage, it was found that variables "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have the highest count of missing values. This is a strong indication that its NAs are not
@@ -196,11 +196,12 @@ summary(train.c2)
 ```
   
 ### 2.2 Technique #2: Drop HBP and CS predictors, and use MICE imputation
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r , results='hide', message=FALSE, warning=FALSE}
 #Technique #2: Drop predictors HBP and CS and use MICE imputation
-train.c1<-training_set%>%select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS))
+train.c1<-training_set %>%
+  select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS)) #Filter dataset
 
-train.c1<-complete(mice(train.c1,method = "lasso.norm",seed = 333))
+train.c1<-complete(mice(train.c1,method = "lasso.norm",seed = 333)) #Using MICE
 
 #Selecting v1 of the imputation data set
 train.clean<-train.c1
@@ -211,16 +212,21 @@ c<-((c-2200)/2200)*100
 sprintf("The newest data set was reduced by %.02f%% from the original",c)
 summary(train.clean)
 
+```
 
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 #Seeing the correlation between non-NA predictors to indicate mutli-collinearity 
 corrplot(cor(train.clean[,2:14]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 ```
 
-Although our observations were significantly reduced, it did open the
+
+### 2.3 Calculating New Predictors
+  
+Although the number of observations were significantly reduced, it did open the
 possibility of new predictors. The MLB[^1] and other baseball fanatic
 sites[^2] provides a list of advanced statistics which expands the
-amount of available predictors. The new predictors introduced to clean
-data set are Strikeouts to walk "STW Ratio" and Total Bases.
+amount of available predictors. The new predictors introduced to the clean
+dataset are Strikeouts to walk ratio "STW Ratio" and Total Bases. Both predictors can be calculated with elementary arithmetic. 
 
 [^1]: <https://www.mlb.com/glossary/advanced-stats>
 
@@ -245,11 +251,13 @@ train.clean<-na.omit(train.clean)
 head(train.clean,3)
 ```
 
-Let's scale our new training set before our analysis as the new
+### 2.4 Scaling the Data
+  
+Scaling the training set before analysis as the new
 variables are not on the same scale. Now, the training set is ready to
 be fitted!
 
-```{r warning=FALSE, include=FALSE}
+```{r warning=FALSE}
 #see any possible predictors for skeweness and apply transformations before fitting 
 g1<-ggplot(data=train.clean,aes(x=TEAM_BATTING_H))+geom_density()+theme_classic()
 g2<-ggplot(data=train.clean,aes(x=TEAM_BATTING_2B))+geom_density()+theme_classic()
