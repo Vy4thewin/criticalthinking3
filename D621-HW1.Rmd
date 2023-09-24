@@ -175,17 +175,24 @@ the dataset. As such, they will be assumed to be missing values. Missing values 
 The first technique consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more than 90% of the dataset. A reduction from 2276 to 191 data points. This technique is not ideal as the reduced number of observations can negatively influence the model's regression. However, a model with this technique will be explored. 
 
 The alternative path consist utilizes imputation to assign values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
-missing values in the dataset. It involves removing predictors that pass a given threshold of randomness. This method assumes that values are missing at random. During the data exploration stage, it was found that variables "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have the highest count of missing values. This is a strong indication that its NAs are not
+missing values in the dataset. It involves removing predictors that pass a given threshold of randomness. This method assumes that values are missing at random. 
+  
+During the data exploration stage, it was found that variables "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have the highest count of missing values. This is a strong indication that its NAs are not
 missing at random. It is best to remove the predictors before running
 the MICE model on the data set. After its removal, a model can be trained.
 
 
-### 2.1 Technique #1: Removing Rows With Any NAs
+### 2.1 Technique #1: Removing Rows With Any Number of NAs
 ```{r}
 #Technique #1: removing rows with any NAs
+#Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
 training_set_na_rem <- na.omit(training_set)
 
-summary(training_set_na_rem)
+#remove the index column as it does not a have effect on the data
+train.c2<-training_set_na_rem %>%
+  select(-c(INDEX))
+
+summary(train.c2)
 ```
   
 ### 2.2 Technique #2: Drop HBP and CS predictors, and use MICE imputation
@@ -194,13 +201,6 @@ summary(training_set_na_rem)
 train.c1<-training_set%>%select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS))
 
 train.c1<-complete(mice(train.c1,method = "lasso.norm",seed = 333))
-
-#Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
-train.c2<-na.omit(training_set)
-
-#remove the index column as it does not a have effect on the data
-train.c2<-train.c2%>%select(-c(INDEX))
-
 
 #Selecting v1 of the imputation data set
 train.clean<-train.c1
