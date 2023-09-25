@@ -25,13 +25,12 @@ library(NHANES)
 library(naniar)
 library(GGally)
 
-
 training_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-training-data.csv")
 test_set<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-evaluation-data.csv")
 ```
 
 ## Introduction of the MoneyBall game statistics from 1871 to 2006
-
+  
 For this analysis a Multiple Linear Regression Model (MLR) will be
 built. The objective is to predict how many games are won, in a given
 season, based on baseball game event metrics. The baseball game events include batting, strikeouts, fielding, and
@@ -125,25 +124,19 @@ error. This will have to be sorted for the analysis.
 ```{r, echo=FALSE}
 any_na(training_set)
 ```
-
+  
 2. How many? What is the proportion of missing values?
 ```{r, echo=FALSE}
 n_miss(training_set)
 prop_miss(training_set)
 ```
-
-3. Which variables are affected?
+  
+3. Which variables are affected? Which contain the most missing values?
 ```{r, echo=FALSE}
 training_set %>% is.na() %>% colSums()
 ```
-
-4. Which variables contain the most missing data?
-```{r, echo=FALSE}
-training_set %>% is.na() %>% colSums()
-gg_miss_var(training_set)
-```
-
-
+  
+  
 ```{r include=FALSE}
 #See the number of NAs per columns. Noticed Batters hit per pitch has the highest count
 colSums(is.na(training_set))
@@ -167,23 +160,22 @@ ggarrange(g,g1,ncol = 2,nrow = 1)
 
 ```
 
-## 2. Data preparation
+## 2. Data Preparation
 
 From the previous section, there is no indication that NAs reflect zeros in
 the dataset. As such, they will be assumed to be missing values. Missing values can be handled with two common techniques.
 
-The first technique consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more than 90% of the dataset. A reduction from 2276 to 191 data points. This technique is not ideal as the reduced number of observations can negatively influence the model's regression. However, a model with this technique will be explored. 
+The first technique consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more than 90% of the dataset. A reduction from 2276 to 191 data points. This technique is not ideal as the reduced number of observations can negatively influence the model's regression. 
 
 The alternative path consist of utilizing imputation to assign synthetic values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
-missing values in the dataset. It involves removing predictors that pass a given threshold of randomness. This method assumes that values are missing at random. 
+missing values in the dataset. It involves removing predictors that pass a given threshold of randomness.
   
 During the data exploration stage, it was found that variables "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have the highest count of missing values. This is a strong indication that its NAs are not
 missing at random. It is best to remove the predictors before running
 the MICE model on the data set. After its removal, a model can be trained.
+  
 
-
-### 2.1 Technique #1: Removing Rows With Any Number of NAs
-```{r}
+```{r eval=FALSE, include=FALSE}
 #Technique #1: removing rows with any NAs
 #Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
 training_set_na_rem <- na.omit(training_set)
@@ -195,32 +187,24 @@ train.c2<-training_set_na_rem %>%
 summary(train.c2)
 ```
   
-### 2.2 Technique #2: Drop HBP and CS predictors, and use MICE imputation
+### 2.1 Using MICE Imputation
 ```{r , results='hide', message=FALSE, warning=FALSE}
 #Technique #2: Drop predictors HBP and CS and use MICE imputation
 train.c1<-training_set %>%
   select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS)) #Filter dataset
 
-train.c1<-complete(mice(train.c1,method = "lasso.norm",seed = 333)) #Using MICE
+train.mice<-complete(mice(train.c1,method = "lasso.norm",seed = 333)) #Using MICE
 
-#Selecting v1 of the imputation data set
-train.clean<-train.c1
-
-#see data set reduction
-c<-191
-c<-((c-2200)/2200)*100
-sprintf("The newest data set was reduced by %.02f%% from the original",c)
-summary(train.clean)
-
+summary(train.mice)
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 #Seeing the correlation between non-NA predictors to indicate mutli-collinearity 
-corrplot(cor(train.clean[,2:14]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
+corrplot(cor(train.mice[,2:14]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 ```
-
-
-### 2.3 Calculating New Predictors
+  
+  
+### 2.2 Calculating New Predictors
   
 Although the number of observations were significantly reduced, it did open the
 possibility of new predictors. The MLB[^1] and other baseball fanatic
@@ -239,59 +223,58 @@ gain by batter by hits
 ```{r include=FALSE}
 # Found some baseball formulas here to add onto our analysis
 #STW= pitchers strikeouts/ walks by batter
-train.clean<-train.clean %>% mutate(STW_Ratio=TEAM_PITCHING_SO/TEAM_BATTING_BB)
+train.mice<-train.mice %>% mutate(STW_Ratio=TEAM_PITCHING_SO/TEAM_BATTING_BB)
 
 #total bases=[H + 2B + (2 X 3B) + (3 X HR)].
-train.clean<-train.clean%>%mutate(TB=TEAM_BATTING_H+TEAM_BATTING_2B+(2*TEAM_BATTING_3B)+(3*TEAM_BATTING_HR))
+train.mice<-train.mice%>%mutate(TB=TEAM_BATTING_H+TEAM_BATTING_2B+(2*TEAM_BATTING_3B)+(3*TEAM_BATTING_HR))
 
 #two observations had NAs
-train.clean<-na.omit(train.clean)
+train.mice<-na.omit(train.mice)
 
 #review new columns
-head(train.clean,3)
+head(train.mice,3)
 ```
 
-### 2.4 Scaling the Data
+### 2.3 Scaling the Data
   
 Scaling the training set before analysis as the new
 variables are not on the same scale. Now, the training set is ready to
 be fitted!
-
-```{r warning=FALSE}
+ 
+```{r echo=FALSE, warning=FALSE}
 #see any possible predictors for skeweness and apply transformations before fitting 
-g1<-ggplot(data=train.clean,aes(x=TEAM_BATTING_H))+geom_density()+theme_classic()
-g2<-ggplot(data=train.clean,aes(x=TEAM_BATTING_2B))+geom_density()+theme_classic()
-g3<-ggplot(data=train.clean,aes(x=TEAM_BATTING_3B))+geom_density()+theme_classic()
-g4<-ggplot(data=train.clean,aes(x=TEAM_BATTING_HR))+geom_density()+theme_classic()
-g5<-ggplot(data=train.clean,aes(x=TEAM_BATTING_BB))+geom_density()+theme_classic()
-g6<-ggplot(data=train.clean,aes(x=TEAM_BATTING_SO))+geom_density()+theme_classic()
-g7<-ggplot(data=train.clean,aes(x=TEAM_BASERUN_SB))+geom_density()+theme_classic()
-g8<-ggplot(data=train.clean,aes(x=TEAM_PITCHING_H))+geom_density()+theme_classic()
-g9<-ggplot(data=train.clean,aes(x=TEAM_PITCHING_HR))+geom_density()+theme_classic()
-g10<-ggplot(data=train.clean,aes(x=TEAM_PITCHING_BB))+geom_density()+theme_classic()
-g11<-ggplot(data=train.clean,aes(x=TEAM_PITCHING_SO))+geom_density()+theme_classic()
-g12<-ggplot(data=train.clean,aes(x=TEAM_FIELDING_E))+geom_density()+theme_classic()
-g13<-ggplot(data=train.clean,aes(x=TEAM_FIELDING_DP))+geom_density()+theme_classic()
-g14<-ggplot(data=train.clean,aes(x=STW_Ratio))+geom_density()+theme_classic()
-g16<-ggplot(data=train.clean,aes(x=TB))+geom_density()+theme_classic()
+g1<-ggplot(data=train.mice,aes(x=TEAM_BATTING_H))+geom_density()+theme_classic()
+g2<-ggplot(data=train.mice,aes(x=TEAM_BATTING_2B))+geom_density()+theme_classic()
+g3<-ggplot(data=train.mice,aes(x=TEAM_BATTING_3B))+geom_density()+theme_classic()
+g4<-ggplot(data=train.mice,aes(x=TEAM_BATTING_HR))+geom_density()+theme_classic()
+g5<-ggplot(data=train.mice,aes(x=TEAM_BATTING_BB))+geom_density()+theme_classic()
+g6<-ggplot(data=train.mice,aes(x=TEAM_BATTING_SO))+geom_density()+theme_classic()
+g7<-ggplot(data=train.mice,aes(x=TEAM_BASERUN_SB))+geom_density()+theme_classic()
+g8<-ggplot(data=train.mice,aes(x=TEAM_PITCHING_H))+geom_density()+theme_classic()
+g9<-ggplot(data=train.mice,aes(x=TEAM_PITCHING_HR))+geom_density()+theme_classic()
+g10<-ggplot(data=train.mice,aes(x=TEAM_PITCHING_BB))+geom_density()+theme_classic()
+g11<-ggplot(data=train.mice,aes(x=TEAM_PITCHING_SO))+geom_density()+theme_classic()
+g12<-ggplot(data=train.mice,aes(x=TEAM_FIELDING_E))+geom_density()+theme_classic()
+g13<-ggplot(data=train.mice,aes(x=TEAM_FIELDING_DP))+geom_density()+theme_classic()
+g14<-ggplot(data=train.mice,aes(x=STW_Ratio))+geom_density()+theme_classic()
+g16<-ggplot(data=train.mice,aes(x=TB))+geom_density()+theme_classic()
 ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12,g13,g14,g16,ncol = 4,nrow = 4)
 
 #only 2b appears to be normal, let's fixed the variables that are positively skewed with a log10 
 #columns 15,12,8 cannot be transformed as some instances have negative numbers
-train.clean<-train.clean%>%mutate_at(c(2,9,11,13,14),~log10(.))
+train.mice<-train.mice%>%mutate_at(c(2,9,11,13,14),~log10(.))
 
 
 #scale the training set so its easier for the system to process the data in the regression model
-train_set<-scale(train.clean)
-train_set <- data.frame(train_set)
+train_set<-data.frame(scale(train.mice))
 ```
 
 ## 3. Building Models
-
+  
 Now we're going to create three linear models with distinct predictor
 values, and compare the results. For our first model, we're going assign
 see the affects of all the stats against *TARGET_WINS*
-
+  
 ```{r}
 #first model using all baseball stats
 fit1 = lm(TARGET_WINS ~., data = train_set)
