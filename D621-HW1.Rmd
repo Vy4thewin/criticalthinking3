@@ -55,7 +55,7 @@ For building linear regression models, data exploration is usually the first ste
 The provided dataset contains two files in CSV format. One for training the MLR model, and one for generating predictions.  
   
 The following variables are found in the dataset:
-
+  
 Variable Name | Definition | Theoretical Effect
 ------------- | ------------- | -------------
 INDEX | Identification Variable (do not use) |  
@@ -262,7 +262,7 @@ ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12,g13,g14,g16,ncol = 4,nrow = 4)
 
 #only 2b appears to be normal, let's fixed the variables that are positively skewed with a log10 
 #columns 15,12,8 cannot be transformed as some instances have negative numbers
-train.mice<-train.mice%>%mutate_at(c(2,9,11,13,14),~log10(.))
+#train.mice<-train.mice%>%mutate_at(c(2,9,11,13,14),~log10(.))
 
 
 #scale the training set so its easier for the system to process the data in the regression model
