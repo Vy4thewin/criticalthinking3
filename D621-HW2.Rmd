@@ -1,0 +1,159 @@
+---
+title: "Data 621 Homework 2"
+author: "Critical Thinking Group 3: Vyannna Hill, Jose Rodriguez, and Christian Uriostegui"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+#loading packages
+library(tidyverse)
+library(caret)
+library(pROC)
+
+data<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/classification-output-data.csv",col_select=c("class","scored.class","scored.probability"))
+
+```
+
+##Classification metrics and the ROC curve
+
+###Creating the confusion matrix
+
+For the confusion matrix, the table is a 2x2 matrix. The table's rows correspond with the predicted value of observation and the columns are the actual value of the observation. Looking at the confusion matrix, it appears 119 observation are predicted correctly out of the 181 observations
+
+```{r message=FALSE, warning=FALSE}
+#confusion matrix: rows are the predicted value and columns are the actual values
+conf.matrix<-table(data$scored.class,data$class)
+colnames(conf.matrix)<-c("Positive","Negative")
+rownames(conf.matrix)<-c("Positive","Negative")
+conf.matrix
+```
+
+
+###Accuracy of the confusion matrix
+
+The accuracy of the prediction is given through the formula
+\(Accruacy=\frac{TP+TN}{TP+FP+TN+FN}\).
+
+In order to perform the formula, we will need the terms below from the confusion matrix.
+*Terms
+  +TP=True Positive
+  +TN=True Negative
+  +FN=False Negative
+  +FP=False Positive
+  
+Looking at our confusion matrix: True Positive is located at [1,1], True Negative is located at [2,2], False Negative located at [1,2], and False Positive located at [2,1].
+
+When the confusion matrix enter the functions, its accuracy score was ~80%. The model predicted correctly on the observations 80% of probability time. There is not a background on the data set provided if 80% accuracy is appropriate probability.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+accuracy<-function(a){
+  #grabbing values from imported data set
+  fp<-a[2,1]
+  fn<-a[1,2]
+  tp<-a[1,1]
+  tn<-a[2,2]  
+
+  #Applying to the accuracy formula provided
+  acc<-(tp+tn)/(tp+fp+tn+fn)
+  sprintf("Accuarcy of the data set is %.03f",acc)
+  return(acc)
+
+}
+#Realized question 11 wants this run all together
+```
+
+###The classification error rate in the confusion matrix
+
+The classification error is the rate of the model's 
+Using the classification error  formula below, let's calculate the error rate!
+\(error=\frac{FP+FN}{TP+FP+TN+FN}\)
+
+The model saw a classification error of ~19%. Adding the accuracy score and the classification error rate together will sum to 1.
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+class.error<-function(a){
+  #same terms uses above
+  fp<-a[2,1]
+  fn<-a[1,2]
+  tp<-a[1,1]
+  tn<-a[2,2] 
+  
+  #Classification error formula provided in the PDF
+  cerror<-(fp+fn)/(tp+fp+tn+fn)
+  sprintf("The Model's classification error is %.03f",cerror)
+  return(cerror)
+}
+
+#Verifying the accuracy and classification error sums to 1
+#print(c.error+ac)
+```
+
+
+###Precision in the confusion matrix
+
+Precision is the rate of positive predictions where identified correctly. The formula below is used in this rate.
+
+\(Precision=\frac{TP}{TP+FP}\)
+
+The model has a ~96% accuracy in correctly predicting positives.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+precisn<-function(a){
+    #only grabbing positives from confusion matrix
+    fp<-a[2,1]
+    tp<-a[1,1]
+    
+    #using the formula provided
+    pre<-tp/(tp+fp)
+    sprintf("The Model's precision is %.03f",pre)
+    return(pre)
+}
+```
+
+### Sensitivity
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+
+```
+
+
+### Specificity 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+
+```
+
+### F1 score
+
+
+#### Bounds of the F1 score
+
+
+### Plotting the ROC Curve
+
+### Running all the created functions above
+
+```{r}
+acc<-accuracy(conf.matrix)
+c.error<-class.error(conf.matrix)
+pr<-precisn(conf.matrix)
+
+#[will need to add calls to the other function and a plotROC]
+
+
+```
+
+### Investigating the caret package in comparsion to metrics above
+
+### Investigating the PROC package in comparsion of the ROC
