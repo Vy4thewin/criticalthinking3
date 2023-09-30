@@ -160,6 +160,27 @@ ggarrange(g,g1,ncol = 2,nrow = 1)
 
 ```
 
+When visualizing correlation strength between target wins and the other predictor variables by using ggpairs, we can see that there aren't many significant relationships. The batting variables all have positive correlations with Target Wins. Some of the pitching and fielding varialbes have negative correlations. A trend we're seeing is that the offensive variables, which include batting, lead to more wins while some of the defensive stats can negatively affect wins. When creating our models, it may be worth creating them with this in mind. Some of the standout pairings are listed below 
+
+1. Target Wins & Team Batting Hits
+TARGET_WINS & TEAM_BATTING_H have a moderately positive correlation of 0.39 which suggests that teams with more batting hits have more wins
+
+2. Target Wins & Team Batting Doubles
+TARGET_WINS & TEAM_BATTING_2B have a weak positive relationship with a correlation of 0.29. Teams with more batting doubles will have slightly more wins 
+ 
+3. Target Wins & Team Batting Walks
+TARGET_WINS & TEAM_BATTING_BB have a weak positive correlation of 0.23. Teams with more batting walks have slightly more wins
+
+4. Target Wins & Team Errors
+TARGET_WINS & TEAM_FIELDING_E have a weak negative correlation of 0.18. Teams with more fielding errors will have slightly less wins.
+
+5. Target Wins & Team Pitching H
+TARGET WINS & TEAM_PITCHING_H has a weak negative correlation of -0.11. Teams with more hits allowed will have slightly less wins.
+
+```{r, echo=FALSE, warning=FALSE}
+ggpairs(training_set)
+```
+
 ## 2. Data Preparation
 
 From the previous section, there is no indication that NAs reflect zeros in
@@ -167,8 +188,7 @@ the dataset. As such, they will be assumed to be missing values. Missing values 
 
 The first technique consists of completely removing all data points containing any amount of NAs. In other words, this method filters to rows that are complete. This method includes all the original predictors at the risk of removing more than 90% of the dataset. A reduction from 2276 to 191 data points. This technique is not ideal as the reduced number of observations can negatively influence the model's regression. 
 
-The alternative path consist of utilizing imputation to assign synthetic values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the
-missing values in the dataset. It involves removing predictors that pass a given threshold of randomness.
+The alternative path consist of utilizing imputation to assign synthetic values. Imputation can take many different forms, but they all accomplish the same goal: to assume a value based on the distribution of the data. For this particular analysis, MICE is used to predict the missing values in the dataset. It involves removing predictors that pass a given threshold of randomness.
   
 During the data exploration stage, it was found that variables "TEAM_BASERUN_CS" and "TEAM_BATTING_HBP" have the highest count of missing values. This is a strong indication that its NAs are not
 missing at random. It is best to remove the predictors before running
@@ -273,13 +293,7 @@ train_set<-data.frame(scale(train.mice))
   
 Now we're going to create three linear models with distinct predictor
 values, and compare the results. For our first model, we're going assign
-see the affects of all the stats against *TARGET_WINS*
-  
-```{r}
-#first model using all baseball stats
-fit1 = lm(TARGET_WINS ~., data = train_set)
-summary(fit1)
-```
+see the effects of all the stats against *TARGET_WINS*.
 
 Looking at the coefficient numbers, we notice something odd. Batting
 variables that should theoretically have a positive effect on winning
@@ -293,6 +307,20 @@ together.
 
 This model has the most predictive values, contains 12 statistically
 significant variables, and has a low R squared value.
+  
+```{r}
+#first model using all baseball stats
+fit1 = lm(TARGET_WINS ~., data = train_set)
+summary(fit1)
+```
+
+In looking at the residual plot models, we can observe linearity and homoscedasticity (variance is constant). We can also see that most points are close to the straight line, which tells us the residuals are normally distributed. In the final visual, we can notice a few deviated points in the model.
+
+```{r}
+par(mfrow=c(2, 2))
+plot(fit1)
+```
+
 
 ------------------------------------------------------------------------
 
@@ -301,12 +329,6 @@ The second model will contain solely batting variables such as
 more points and home runs, therefore increase the chances of a team to
 win. This can lead to a strong predictive.
 
-```{r}
-#second model with just batting variables
-fit2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO, data = train_set)
-summary(fit2)
-```
-
 Unlike the first model where some of the batting variables had negative
 coefficients, most of them are positive here - which matches the effect
 that they have on a game.
@@ -314,6 +336,19 @@ that they have on a game.
 Overall this has less predictor values compared to model 1, is comprised
 mainly of statistically significant variables, but has a lower R squared
 compared to model 1
+
+```{r}
+#second model with just batting variables
+fit2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO, data = train_set)
+summary(fit2)
+```
+
+Though this model meets linearity and homoscedasticity, the first model appears more linear. In the QQ plot, the residual points mostly fall on the line, with the end and front of the tail deviating slightly from it. We can observe a few outlier points. 
+
+```{r}
+par(mfrow=c(2, 2))
+plot(fit2)
+```
 
 ------------------------------------------------------------------------
 
@@ -330,6 +365,14 @@ also potentially give us a high winning percentage.
 fit3 <- lm(TARGET_WINS ~ TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = train_set)
 summary(fit3)
 ```
+
+This model does not appear linear based on the vertical shape of the data points, it is homoscedastic. Though the model is normally distributed, compared to the previous models, it has the most points that fall off the line on both ends of the tail. This model appears to be the weakest model of the three.
+
+```{r}
+par(mfrow=c(2, 2))
+plot(fit3)
+```
+
 
 The variables *TEAM_PITCHING_H*, *TEAM_PITCHING_HR*, *TEAM_PITCHING_BB*
 have positive coefficients which makes sense given that they have a
