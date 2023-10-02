@@ -16,7 +16,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r message=FALSE, include=FALSE}
+```{r, loading data and libraries, message=FALSE, include=FALSE}
 library(tidyverse)
 library(ggpubr)
 library(corrplot)
@@ -109,7 +109,7 @@ grid.arrange(plot1, plot2, ncol=2)
 
   
 ### 1.3 Data Wrangling Pre-inspection:
-```{r}
+```{r, checking for nulls}
 summary(training_set)
 ```
   
@@ -149,7 +149,7 @@ colSums(is.na(training_set))
 Two possible predictor values were selected to plot against TARGET_WINS. TEAM_BATTING_BB (Walks by Batter), and TEAM_BATTING_HR (Home
 runs by Batter). There is concern for both variables as they do not appear to have a linear relationship with TARGET_WINS. Ultimately, this can be influenced by another variables.??
 
-```{r, echo=FALSE}
+```{r, checking linear trends, echo=FALSE}
 #Visually checking for a positive linear trend with a singular predictor value
 g<-ggplot(training_set,aes(x=TEAM_BATTING_BB,y=TARGET_WINS))+geom_point()+labs(title = "Teams Wins vs Walks by Batter",x="Walks by Batter",y="# of wins")+theme_classic()
 
@@ -178,7 +178,7 @@ TARGET_WINS & TEAM_FIELDING_E have a weak negative correlation of 0.18. Teams wi
 5. Target Wins & Team Pitching H
 TARGET WINS & TEAM_PITCHING_H has a weak negative correlation of -0.11. Teams with more hits allowed will have slightly less wins.
 
-```{r, echo=FALSE, warning=FALSE}
+```{r, viewing predictor plots, echo=FALSE, warning=FALSE}
 ggpairs(training_set)
 ```
 
@@ -196,7 +196,7 @@ missing at random. It is best to remove these predictors before running
 the MICE model on the data set. After its removal, a model can be trained.
   
 
-```{r eval=FALSE, include=FALSE}
+```{r, model w/ deletion, eval=FALSE, include=FALSE}
 #Technique #1: removing rows with any NAs
 #Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model
 training_set_na_rem <- na.omit(training_set)
@@ -209,7 +209,7 @@ summary(train.c2)
 ```
   
 ### 2.1 Using MICE Imputation
-```{r , results='hide', message=FALSE, warning=FALSE}
+```{r, imputation, results='hide', message=FALSE, warning=FALSE}
 #Technique #2: Drop predictors HBP and CS and use MICE imputation
 train.c1<-training_set %>%
   select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS)) #Filter dataset
@@ -219,7 +219,7 @@ train.mice<-complete(mice(train.c1,method = "lasso.norm",seed = 333)) #Using MIC
 summary(train.mice)
 ```
 
-```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r, correlation plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 #Seeing the correlation between non-NA predictors to indicate mutli-collinearity 
 corrplot(cor(train.mice[,2:14]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 ```
@@ -241,7 +241,7 @@ dataset are Strikeouts to walk ratio "STW Ratio" and Total Bases. Both predictor
 the times a batter walks to first base +Total Bases: Number of bases
 gain by batter by hits
 
-```{r include=FALSE}
+```{r, feature engineering, include=FALSE}
 # Found some baseball formulas here to add onto our analysis
 #STW= pitchers strikeouts/ walks by batter
 train.mice<-train.mice %>% mutate(STW_Ratio=TEAM_PITCHING_SO/TEAM_BATTING_BB)
@@ -262,7 +262,7 @@ Scaling the training set before analysis as the new
 variables are not on the same scale. Now, the training set is ready to
 be fitted!
  
-```{r echo=FALSE, warning=FALSE}
+```{r, scaling data, echo=FALSE, warning=FALSE}
 #see any possible predictors for skeweness and apply transformations before fitting 
 g1<-ggplot(data=train.mice,aes(x=TEAM_BATTING_H))+geom_density()+theme_classic()
 g2<-ggplot(data=train.mice,aes(x=TEAM_BATTING_2B))+geom_density()+theme_classic()
@@ -311,7 +311,7 @@ together.
 This model has the most predictive values, contains 12 statistically
 significant variables, and has an R squared value of 0.3816.
   
-```{r echo=FALSE}
+```{r, model 1 training, echo=FALSE}
 #first model using all predictors
 fit1 = lm(TARGET_WINS ~., data = train_set)
 summary(fit1)
@@ -319,18 +319,18 @@ summary(fit1)
 
 When investigating the residual plots, linearity and homoscedasticity is observed (variance is constant). In the Normal Q-Q plot it can be seen that most points adhere to the diagonal line indicating a normal distribution of residuals. In the leverage visual, we can notice a few deviated points in the model.
 
-```{r echo=FALSE}
+```{r, model 1 plotting residuals, echo=FALSE}
 par(mfrow=c(2, 2))
 plot(fit1)
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r, model 1 residuals, eval=FALSE, include=FALSE}
 plot(fitted(fit1),residuals(fit1),xlab="Fitted",ylab="Residuals")
 abline(h=0)
 ```
 
 
-```{r eval=FALSE, include=FALSE}
+```{r, model 1 checking for outliers, eval=FALSE, include=FALSE}
 #Removing the largest outlier point we have a very similar R squared.
 cook <- cooks.distance(fit1)
 halfnorm(cook,2, ylab="Cook’s distances")
@@ -351,7 +351,7 @@ coefficients, most of them are positive here - which which aligns with what is t
 This model contains less predictor variables when compared to model 1, however it is comprised
 mainly of statistically significant variables. A lower R squared value is observed, meaning that fielding and pitching explains a large portion of variance.
 
-```{r include=FALSE}
+```{r, model 2 training, include=FALSE}
 #second model with just batting variables
 fit2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO, data = train_set)
 summary(fit2)
@@ -359,7 +359,7 @@ summary(fit2)
 
 Though this model meets linearity and homoscedasticity, the first model appears to be more linear. In the QQ plot, the residual points mostly fall on the diagonal line, with both tails slightly deviating away from it. We can observe a few outlier points which
 
-```{r echo=FALSE}
+```{r, model 2 residuals, echo=FALSE}
 par(mfrow=c(2, 2))
 plot(fit2)
 ```
@@ -374,7 +374,7 @@ Fielding Double Plays - which is the ability to achieve two outs in a
 defensive play - can also increase the chances of a win. This model can
 also potentially give us a high winning percentage.
 
-```{r}
+```{r, model 3 training}
 #third model with pitching and fielding variables
 fit3 <- lm(TARGET_WINS ~ TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = train_set)
 summary(fit3)
@@ -382,7 +382,7 @@ summary(fit3)
 
 This model does not appear linear based on the vertical shape of the data points, it is homoscedastic. Though the model is normally distributed, compared to the previous models, it has the most points that fall off the line on both ends of the tail. This model appears to be the weakest model of the three.
 
-```{r}
+```{r, model 3 residuals}
 par(mfrow=c(2, 2))
 plot(fit3)
 ```
@@ -400,21 +400,21 @@ lowest R squared compared to the other models.
 
 ## 4. Model Selection
   
-The model of choice will be model 1. Based on the findings, it is evident that both offense and defense variable together explain the variance best. However, it should be noted that model 1 has 16 predictors. It would be a good idea to explore using a subset of variables, perhaps by using a 'stepwise' or 'regsubsets' algorithm from the leaps library. Furthermore, it should be noted that R squared always increases with the addition of more predictors, therefore its best to abide by the Adjusted R squared instead.
+The model of choice will be model 1. Based on the findings, it is evident that both offense and defense variable together explain the variance best. However, it should be noted that model 1 has 16 predictors. It would be a good idea to experiment using a subset of variables, perhaps by using a 'stepwise' or 'regsubsets' algorithm from the leaps library. Furthermore, it should be noted that R squared always increases with the addition of more predictors, therefore its best to abide by the Adjusted R squared instead.
 
-Next, residuals were inspected to check model conformance. For model 1 and 2 there residuals seem to be normally distributed and display constant variance. However, model 3 
+Next, residuals were inspected to check model conformance. For model 1 and 2 there residuals seem to be normally distributed and display constant variance. However, model 3 display made it very poor candidate in terms of residual diagnostics and Adjusted R squared score. 
 
 Furthermore, it would be a good idea to explore removing TEAM_BATTING_HR as it has a high correlation to TEAM_BATTING_SO and TEAM_PITCHING_HR.
   
-Predictions on test_set
-```{r warning=FALSE}
+Predictions on test_set:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 #data cleanup
 test.c1 <-test_set %>%
   select(-c(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS)) #Filter dataset
 
 test.mice<-complete(mice(test.c1,method = "lasso.norm",seed = 333)) #Using MICE
 
-test.mice<-test.mice %>% 
+test.mice<-test.mice %>%
   mutate(STW_Ratio=TEAM_PITCHING_SO/TEAM_BATTING_BB)
 
 #total bases=[H + 2B + (2 X 3B) + (3 X HR)].
@@ -422,21 +422,22 @@ test.mice<-test.mice%>%
   mutate(TB=TEAM_BATTING_H+TEAM_BATTING_2B+(2*TEAM_BATTING_3B)+(3*TEAM_BATTING_HR))
 
 #X observations had NAs
-#test.mice<-na.omit(test.mice)
-
+test.mice<-na.omit(test.mice)
+ 
 test.mice<-test.mice%>%
-  mutate_at(c(2,9,11,13,14),~log10(.))
+  mutate_at(c(1,8,10,12,13),~log10(.))
 
 test_set<-data.frame(scale(test.mice))
 
 #predict
-predict(fit1,new=test_set)
+s.pred <- predict(fit1,new=test_set)
+
+# backtransform scale:
+(pred <- s.pred * sd(train.mice$TARGET_WINS) + mean(train.mice$TARGET_WINS))
 ```
 
 
 ## Appendix
 
-\`\`\`{r} #All Code will be display here [will update to include all
-code in this block below]
-
-\`\`\`\`
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```

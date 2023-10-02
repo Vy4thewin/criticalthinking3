@@ -610,22 +610,19 @@ the lowest R squared compared to the other models.</p>
 <p>The model of choice will be model 1. Based on the findings, it is
 evident that both offense and defense variable together explain the
 variance best. However, it should be noted that model 1 has 16
-predictors. It would be a good idea to explore using a subset of
+predictors. It would be a good idea to experiment using a subset of
 variables, perhaps by using a ‘stepwise’ or ‘regsubsets’ algorithm from
 the leaps library. Furthermore, it should be noted that R squared always
 increases with the addition of more predictors, therefore its best to
 abide by the Adjusted R squared instead.</p>
 <p>Next, residuals were inspected to check model conformance. For model
 1 and 2 there residuals seem to be normally distributed and display
-constant variance. However, model 3</p>
+constant variance. However, model 3 display made it very poor candidate
+in terms of residual diagnostics and Adjusted R squared score.</p>
 <p>Furthermore, it would be a good idea to explore removing
 TEAM_BATTING_HR as it has a high correlation to TEAM_BATTING_SO and
 TEAM_PITCHING_HR.</p>
-<p>Predictions on test_set</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co">#data cleanup</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>test.c1 <span class="ot">&lt;-</span>test_set <span class="sc">%&gt;%</span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS)) <span class="co">#Filter dataset</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span><span class="fu">complete</span>(<span class="fu">mice</span>(test.c1,<span class="at">method =</span> <span class="st">&quot;lasso.norm&quot;</span>,<span class="at">seed =</span> <span class="dv">333</span>)) <span class="co">#Using MICE</span></span></code></pre></div>
+<p>Predictions on test_set:</p>
 <pre><code>## 
 ##  iter imp variable
 ##   1   1  TEAM_BATTING_SO  TEAM_BASERUN_SB  TEAM_PITCHING_SO  TEAM_FIELDING_DP
@@ -653,56 +650,230 @@ TEAM_PITCHING_HR.</p>
 ##   5   3  TEAM_BATTING_SO  TEAM_BASERUN_SB  TEAM_PITCHING_SO  TEAM_FIELDING_DP
 ##   5   4  TEAM_BATTING_SO  TEAM_BASERUN_SB  TEAM_PITCHING_SO  TEAM_FIELDING_DP
 ##   5   5  TEAM_BATTING_SO  TEAM_BASERUN_SB  TEAM_PITCHING_SO  TEAM_FIELDING_DP</code></pre>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span>test.mice <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">STW_Ratio=</span>TEAM_PITCHING_SO<span class="sc">/</span>TEAM_BATTING_BB)</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a></span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#total bases=[H + 2B + (2 X 3B) + (3 X HR)].</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span>test.mice<span class="sc">%&gt;%</span><span class="fu">mutate</span>(<span class="at">TB=</span>TEAM_BATTING_H<span class="sc">+</span>TEAM_BATTING_2B<span class="sc">+</span>(<span class="dv">2</span><span class="sc">*</span>TEAM_BATTING_3B)<span class="sc">+</span>(<span class="dv">3</span><span class="sc">*</span>TEAM_BATTING_HR))</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a></span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co">#two observations had NAs</span></span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span><span class="fu">na.omit</span>(test.mice)</span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a></span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span>test.mice<span class="sc">%&gt;%</span><span class="fu">mutate_at</span>(<span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">9</span>,<span class="dv">11</span>,<span class="dv">13</span>,<span class="dv">14</span>),<span class="sc">~</span><span class="fu">log10</span>(.))</span></code></pre></div>
-<pre><code>## Warning: There was 1 warning in `mutate()`.
-## i In argument: `TEAM_FIELDING_DP = (structure(function (..., .x = ..1, .y =
-##   ..2, . = ..1) ...`.
-## Caused by warning in `log10()`:
-## ! NaNs produced</code></pre>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>test_set<span class="ot">&lt;-</span><span class="fu">data.frame</span>(<span class="fu">scale</span>(test.mice))</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a></span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#predict</span></span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="fu">predict</span>(fit1,<span class="at">new=</span>test_set)</span></code></pre></div>
-<pre><code>##   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-##  21  22  23  24  25  26  27  28  29  30  31  32  33  34  35  36  37  38  39  40 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-##  41  42  43  44  45  46  47  48  49  50  51  52  53  54  55  56  57  58  59  60 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-##  61  62  63  64  65  66  67  68  69  70  71  72  73  74  75  76  77  78  79  80 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-##  81  82  83  84  85  86  87  88  89  90  91  92  93  94  95  96  97  98  99 100 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN 
-## 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256 257 258 259 
-## NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN</code></pre>
+<pre><code>##         1         2         3         4         5         6         7         8 
+##  66.77140  71.04229  75.78749  84.38106  66.27144  66.84261  79.77936  70.22385 
+##         9        10        11        12        13        14        15        16 
+##  72.91115  75.50288  71.02994  82.12591  81.71390  82.80009  88.14660  77.40089 
+##        17        18        19        20        21        22        23        24 
+##  71.15455  78.52890  75.47073  87.78210  87.64114  86.79996  81.72249  73.29235 
+##        25        26        27        28        29        30        31        32 
+##  84.23658  88.65174  53.78645  73.97883  84.95389  74.15989  89.09715  87.64551 
+##        33        34        35        36        37        38        39        40 
+##  86.29994  83.15900  80.44587  79.56313  76.67294  86.36835  86.44824  87.32330 
+##        41        42        43        44        45        46        47        48 
+##  82.70895  98.12180  47.11341 101.61824  94.31540  94.07337  94.18526  71.57525 
+##        49        50        51        52        53        54        55        56 
+##  67.97226  79.40646  79.00394  88.34526  72.73849  77.81022  71.79017  83.83060 
+##        57        58        59        60        61        62        63        64 
+##  86.60914  75.63829  60.50815  76.49365  90.59260  86.36401  86.22641  82.71758 
+##        65        66        67        68        69        70        71        72 
+##  85.02605  97.55045  66.57847  75.77033  73.49095  86.27999  93.21098  82.46528 
+##        73        74        75        76        77        78        79        80 
+##  80.66697  87.29189  79.43335  77.83774  86.15015  80.58530  64.00336  81.94677 
+##        81        82        83        84        85        86        87        88 
+##  84.42870  87.29227  95.07848  78.43919  83.35695  82.84563  84.19305  87.79388 
+##        89        90        91        92        93        94        95        96 
+##  93.49700  87.25368  77.30745  65.07671  69.76554  87.11775  82.94743  74.14313 
+##        97        98        99       100       101       102       103       104 
+##  88.67839 102.75324  90.67548  90.26988  82.73692  74.23017  86.60775  84.35627 
+##       105       106       107       108       109       110       111       112 
+##  71.83857  60.58636  70.57662  77.54853  87.14401  55.06371  85.09405  86.45631 
+##       113       114       115       116       117       118       119       120 
+##  94.72044  92.15125  82.84928  81.20067  86.57220  80.40547  74.79330  73.39611 
+##       121       122       123       124       125       126       127       128 
+##  89.69304  62.21416  69.35988  72.47921  69.57484  88.94260  91.04090  76.92359 
+##       129       130       131       132       133       134       135       136 
+##  90.13998  91.24440  85.00175  85.07337  72.35823  80.06601  92.87063  69.04768 
+##       137       138       139       140       141       142       143       144 
+##  77.74281  80.80925  96.57259  80.90864  61.14031  74.50273  94.23246  72.58449 
+##       145       146       147       148       149       150       151       152 
+##  80.47611  76.20614  72.36174  83.53889  84.20930  84.45616  80.82163  86.63302 
+##       153       154       155       156       157       158       159       160 
+##  24.57422  68.52798  82.14616  70.37849  86.92260  86.69848  86.58231  64.76061 
+##       161       162       163       164       165       166       167       168 
+##  99.46214 105.71581  95.64833 100.99398  94.29612  96.10413  86.25641  85.78078 
+##       169       170       171       172       173       174       175       176 
+##  72.99604  81.28457  84.37795  88.91873  82.79714  95.28431  78.66093  81.22074 
+##       177       178       179       180       181       182       183       184 
+##  83.45291  71.38542  77.56347  79.09162  87.04849  81.39238  87.56585  84.72452 
+##       185       186       187       188       189       190       191       192 
+##  68.71633  89.41641  78.90706       NaN  57.77629 105.55508  63.98086  79.36364 
+##       193       194       195       196       197       198       199       200 
+##  73.12799  77.93047  76.97805  66.22271  73.66815  90.46414  81.58155  85.29135 
+##       201       202       203       204       205       206       207       208 
+##  72.32330  83.90060  79.22275  92.88797  83.22815  82.74198  82.47086  81.05699 
+##       209       210       211       212       213       214       215       216 
+##  73.83665  68.44657 100.39224  87.99148  82.30745  65.73996  71.70442  86.29809 
+##       217       218       219       220       221       222       223       224 
+##  82.25456  90.14471  80.05481  81.05915  75.49500  72.96026  78.00372  77.31491 
+##       225       226       227       228       229       230       231       232 
+##  73.06563  79.81284  79.74706  75.32134  85.00478  97.99532  71.57424  95.12770 
+##       233       234       235       236       237       238       239       240 
+##  83.23795  84.46891  76.09208  76.80335  77.99903  81.60996  85.73657  71.49442 
+##       241       242       243       244       245       246       247       248 
+##  87.53042  94.56050  89.06868  85.61235  63.71742  87.39294  80.44831  80.96891 
+##       249       250       251       252       253       254       255       256 
+##  78.54440  84.54764  79.66732  56.41372  90.31944       NaN  73.22536  77.23297 
+##       257       258       259 
+##  83.13359  80.22078  72.22607</code></pre>
 </div>
 <div id="appendix" class="section level2">
 <h2>Appendix</h2>
-<p>```{r} #All Code will be display here [will update to include all
-code in this block below]</p>
-<p>````</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">library</span>(ggpubr)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">library</span>(corrplot)</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="fu">library</span>(mice)</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="fu">library</span>(NHANES)</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="fu">library</span>(naniar)</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="fu">library</span>(GGally)</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="fu">library</span>(faraway)</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>training_set<span class="ot">&lt;-</span><span class="fu">read_csv</span>(<span class="st">&quot;https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-training-data.csv&quot;</span>)</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>test_set<span class="ot">&lt;-</span><span class="fu">read_csv</span>(<span class="st">&quot;https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/moneyball-evaluation-data.csv&quot;</span>)</span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="fu">require</span>(gridExtra)</span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>plot1 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span> <span class="co"># Boxplot of TARGET_WINS</span></span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>(<span class="fu">aes</span>(<span class="at">y =</span> training_set<span class="sc">$</span>TARGET_WINS)) <span class="sc">+</span> </span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>  <span class="fu">scale_x_discrete</span>( ) <span class="sc">+</span></span>
+<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Dist. of Game Wins per Season&quot;</span>,</span>
+<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">&quot;Number of Wins&quot;</span>)</span>
+<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a></span>
+<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a><span class="co"># compute mean TARTGET_WINS</span></span>
+<span id="cb14-20"><a href="#cb14-20" tabindex="-1"></a>mean_tw <span class="ot">&lt;-</span> training_set <span class="sc">%&gt;%</span> </span>
+<span id="cb14-21"><a href="#cb14-21" tabindex="-1"></a>  <span class="fu">pull</span>(TARGET_WINS) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-22"><a href="#cb14-22" tabindex="-1"></a>  <span class="fu">mean</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-23"><a href="#cb14-23" tabindex="-1"></a>  <span class="fu">signif</span>(<span class="dv">6</span>)</span>
+<span id="cb14-24"><a href="#cb14-24" tabindex="-1"></a></span>
+<span id="cb14-25"><a href="#cb14-25" tabindex="-1"></a>plot2 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>( <span class="co">#review distribution of the response variable, see if not bi-modal </span></span>
+<span id="cb14-26"><a href="#cb14-26" tabindex="-1"></a>  <span class="at">data=</span>training_set, <span class="fu">aes</span>(<span class="at">x=</span>TARGET_WINS))<span class="sc">+</span></span>
+<span id="cb14-27"><a href="#cb14-27" tabindex="-1"></a>  <span class="fu">geom_density</span>()<span class="sc">+</span></span>
+<span id="cb14-28"><a href="#cb14-28" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">&quot;Density&quot;</span>,</span>
+<span id="cb14-29"><a href="#cb14-29" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">&quot;Number of Wins&quot;</span>)<span class="sc">+</span></span>
+<span id="cb14-30"><a href="#cb14-30" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept=</span>mean_tw, <span class="at">size=</span><span class="fl">1.2</span>, <span class="at">color=</span><span class="st">&quot;red&quot;</span>)</span>
+<span id="cb14-31"><a href="#cb14-31" tabindex="-1"></a></span>
+<span id="cb14-32"><a href="#cb14-32" tabindex="-1"></a></span>
+<span id="cb14-33"><a href="#cb14-33" tabindex="-1"></a><span class="fu">grid.arrange</span>(plot1, plot2, <span class="at">ncol=</span><span class="dv">2</span>)</span>
+<span id="cb14-34"><a href="#cb14-34" tabindex="-1"></a><span class="fu">summary</span>(training_set)</span>
+<span id="cb14-35"><a href="#cb14-35" tabindex="-1"></a><span class="fu">any_na</span>(training_set)</span>
+<span id="cb14-36"><a href="#cb14-36" tabindex="-1"></a><span class="fu">n_miss</span>(training_set)</span>
+<span id="cb14-37"><a href="#cb14-37" tabindex="-1"></a><span class="fu">prop_miss</span>(training_set)</span>
+<span id="cb14-38"><a href="#cb14-38" tabindex="-1"></a>training_set <span class="sc">%&gt;%</span> <span class="fu">is.na</span>() <span class="sc">%&gt;%</span> <span class="fu">colSums</span>()</span>
+<span id="cb14-39"><a href="#cb14-39" tabindex="-1"></a><span class="co">#See the number of NAs per columns. Noticed Batters hit per pitch has the highest count</span></span>
+<span id="cb14-40"><a href="#cb14-40" tabindex="-1"></a><span class="fu">colSums</span>(<span class="fu">is.na</span>(training_set))</span>
+<span id="cb14-41"><a href="#cb14-41" tabindex="-1"></a></span>
+<span id="cb14-42"><a href="#cb14-42" tabindex="-1"></a><span class="co">#Visually checking for a positive linear trend with a singular predictor value</span></span>
+<span id="cb14-43"><a href="#cb14-43" tabindex="-1"></a>g<span class="ot">&lt;-</span><span class="fu">ggplot</span>(training_set,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_BB,<span class="at">y=</span>TARGET_WINS))<span class="sc">+</span><span class="fu">geom_point</span>()<span class="sc">+</span><span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Teams Wins vs Walks by Batter&quot;</span>,<span class="at">x=</span><span class="st">&quot;Walks by Batter&quot;</span>,<span class="at">y=</span><span class="st">&quot;# of wins&quot;</span>)<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-44"><a href="#cb14-44" tabindex="-1"></a></span>
+<span id="cb14-45"><a href="#cb14-45" tabindex="-1"></a><span class="co"># plotting the wins vs home runs</span></span>
+<span id="cb14-46"><a href="#cb14-46" tabindex="-1"></a>g1<span class="ot">&lt;-</span><span class="fu">ggplot</span>(training_set,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_HR,<span class="at">y=</span>TARGET_WINS))<span class="sc">+</span><span class="fu">geom_point</span>()<span class="sc">+</span><span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Teams Wins vs Home runs by Batter&quot;</span>,<span class="at">x=</span><span class="st">&quot;# of Homeruns&quot;</span>,<span class="at">y=</span><span class="st">&quot;# of wins&quot;</span>)<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-47"><a href="#cb14-47" tabindex="-1"></a></span>
+<span id="cb14-48"><a href="#cb14-48" tabindex="-1"></a><span class="co">#Viewing multiple graphs with a selected predictor variable and its response (wins)</span></span>
+<span id="cb14-49"><a href="#cb14-49" tabindex="-1"></a><span class="fu">ggarrange</span>(g,g1,<span class="at">ncol =</span> <span class="dv">2</span>,<span class="at">nrow =</span> <span class="dv">1</span>)</span>
+<span id="cb14-50"><a href="#cb14-50" tabindex="-1"></a></span>
+<span id="cb14-51"><a href="#cb14-51" tabindex="-1"></a><span class="fu">ggpairs</span>(training_set)</span>
+<span id="cb14-52"><a href="#cb14-52" tabindex="-1"></a><span class="co">#Technique #1: removing rows with any NAs</span></span>
+<span id="cb14-53"><a href="#cb14-53" tabindex="-1"></a><span class="co">#Noticed there are entries with NAs values that cannot be replaced with a formula. These entries will be removed from the training_set to prevent a inaccurate model</span></span>
+<span id="cb14-54"><a href="#cb14-54" tabindex="-1"></a>training_set_na_rem <span class="ot">&lt;-</span> <span class="fu">na.omit</span>(training_set)</span>
+<span id="cb14-55"><a href="#cb14-55" tabindex="-1"></a></span>
+<span id="cb14-56"><a href="#cb14-56" tabindex="-1"></a><span class="co">#remove the index column as it does not a have effect on the data</span></span>
+<span id="cb14-57"><a href="#cb14-57" tabindex="-1"></a>train.c2<span class="ot">&lt;-</span>training_set_na_rem <span class="sc">%&gt;%</span></span>
+<span id="cb14-58"><a href="#cb14-58" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(INDEX))</span>
+<span id="cb14-59"><a href="#cb14-59" tabindex="-1"></a></span>
+<span id="cb14-60"><a href="#cb14-60" tabindex="-1"></a><span class="fu">summary</span>(train.c2)</span>
+<span id="cb14-61"><a href="#cb14-61" tabindex="-1"></a><span class="co">#Technique #2: Drop predictors HBP and CS and use MICE imputation</span></span>
+<span id="cb14-62"><a href="#cb14-62" tabindex="-1"></a>train.c1<span class="ot">&lt;-</span>training_set <span class="sc">%&gt;%</span></span>
+<span id="cb14-63"><a href="#cb14-63" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS)) <span class="co">#Filter dataset</span></span>
+<span id="cb14-64"><a href="#cb14-64" tabindex="-1"></a></span>
+<span id="cb14-65"><a href="#cb14-65" tabindex="-1"></a>train.mice<span class="ot">&lt;-</span><span class="fu">complete</span>(<span class="fu">mice</span>(train.c1,<span class="at">method =</span> <span class="st">&quot;lasso.norm&quot;</span>,<span class="at">seed =</span> <span class="dv">333</span>)) <span class="co">#Using MICE</span></span>
+<span id="cb14-66"><a href="#cb14-66" tabindex="-1"></a></span>
+<span id="cb14-67"><a href="#cb14-67" tabindex="-1"></a><span class="fu">summary</span>(train.mice)</span>
+<span id="cb14-68"><a href="#cb14-68" tabindex="-1"></a><span class="co">#Seeing the correlation between non-NA predictors to indicate mutli-collinearity </span></span>
+<span id="cb14-69"><a href="#cb14-69" tabindex="-1"></a><span class="fu">corrplot</span>(<span class="fu">cor</span>(train.mice[,<span class="dv">2</span><span class="sc">:</span><span class="dv">14</span>]),<span class="at">method =</span> <span class="st">&quot;number&quot;</span>,<span class="at">type=</span><span class="st">&quot;lower&quot;</span>, <span class="at">tl.srt =</span> .<span class="dv">71</span>,<span class="at">number.cex=</span><span class="fl">0.75</span>)</span>
+<span id="cb14-70"><a href="#cb14-70" tabindex="-1"></a><span class="co"># Found some baseball formulas here to add onto our analysis</span></span>
+<span id="cb14-71"><a href="#cb14-71" tabindex="-1"></a><span class="co">#STW= pitchers strikeouts/ walks by batter</span></span>
+<span id="cb14-72"><a href="#cb14-72" tabindex="-1"></a>train.mice<span class="ot">&lt;-</span>train.mice <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">STW_Ratio=</span>TEAM_PITCHING_SO<span class="sc">/</span>TEAM_BATTING_BB)</span>
+<span id="cb14-73"><a href="#cb14-73" tabindex="-1"></a></span>
+<span id="cb14-74"><a href="#cb14-74" tabindex="-1"></a><span class="co">#total bases=[H + 2B + (2 X 3B) + (3 X HR)].</span></span>
+<span id="cb14-75"><a href="#cb14-75" tabindex="-1"></a>train.mice<span class="ot">&lt;-</span>train.mice<span class="sc">%&gt;%</span><span class="fu">mutate</span>(<span class="at">TB=</span>TEAM_BATTING_H<span class="sc">+</span>TEAM_BATTING_2B<span class="sc">+</span>(<span class="dv">2</span><span class="sc">*</span>TEAM_BATTING_3B)<span class="sc">+</span>(<span class="dv">3</span><span class="sc">*</span>TEAM_BATTING_HR))</span>
+<span id="cb14-76"><a href="#cb14-76" tabindex="-1"></a></span>
+<span id="cb14-77"><a href="#cb14-77" tabindex="-1"></a><span class="co">#two observations had NAs</span></span>
+<span id="cb14-78"><a href="#cb14-78" tabindex="-1"></a>train.mice<span class="ot">&lt;-</span><span class="fu">na.omit</span>(train.mice)</span>
+<span id="cb14-79"><a href="#cb14-79" tabindex="-1"></a></span>
+<span id="cb14-80"><a href="#cb14-80" tabindex="-1"></a><span class="co">#review new columns</span></span>
+<span id="cb14-81"><a href="#cb14-81" tabindex="-1"></a><span class="fu">head</span>(train.mice,<span class="dv">3</span>)</span>
+<span id="cb14-82"><a href="#cb14-82" tabindex="-1"></a><span class="co">#see any possible predictors for skeweness and apply transformations before fitting </span></span>
+<span id="cb14-83"><a href="#cb14-83" tabindex="-1"></a>g1<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_H))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-84"><a href="#cb14-84" tabindex="-1"></a>g2<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_2B))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-85"><a href="#cb14-85" tabindex="-1"></a>g3<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_3B))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-86"><a href="#cb14-86" tabindex="-1"></a>g4<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_HR))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-87"><a href="#cb14-87" tabindex="-1"></a>g5<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_BB))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-88"><a href="#cb14-88" tabindex="-1"></a>g6<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BATTING_SO))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-89"><a href="#cb14-89" tabindex="-1"></a>g7<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_BASERUN_SB))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-90"><a href="#cb14-90" tabindex="-1"></a>g8<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_PITCHING_H))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-91"><a href="#cb14-91" tabindex="-1"></a>g9<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_PITCHING_HR))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-92"><a href="#cb14-92" tabindex="-1"></a>g10<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_PITCHING_BB))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-93"><a href="#cb14-93" tabindex="-1"></a>g11<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_PITCHING_SO))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-94"><a href="#cb14-94" tabindex="-1"></a>g12<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_FIELDING_E))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-95"><a href="#cb14-95" tabindex="-1"></a>g13<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TEAM_FIELDING_DP))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-96"><a href="#cb14-96" tabindex="-1"></a>g14<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>STW_Ratio))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-97"><a href="#cb14-97" tabindex="-1"></a>g16<span class="ot">&lt;-</span><span class="fu">ggplot</span>(<span class="at">data=</span>train.mice,<span class="fu">aes</span>(<span class="at">x=</span>TB))<span class="sc">+</span><span class="fu">geom_density</span>()<span class="sc">+</span><span class="fu">theme_classic</span>()</span>
+<span id="cb14-98"><a href="#cb14-98" tabindex="-1"></a><span class="fu">ggarrange</span>(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12,g13,g14,g16,<span class="at">ncol =</span> <span class="dv">4</span>,<span class="at">nrow =</span> <span class="dv">4</span>)</span>
+<span id="cb14-99"><a href="#cb14-99" tabindex="-1"></a></span>
+<span id="cb14-100"><a href="#cb14-100" tabindex="-1"></a><span class="co">#only 2b appears to be normal, let&#39;s fixed the variables that are positively skewed with a log10 </span></span>
+<span id="cb14-101"><a href="#cb14-101" tabindex="-1"></a><span class="co">#columns 15,12,8 cannot be transformed as some instances have negative numbers</span></span>
+<span id="cb14-102"><a href="#cb14-102" tabindex="-1"></a>train.mice<span class="ot">&lt;-</span>train.mice<span class="sc">%&gt;%</span><span class="fu">mutate_at</span>(<span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">9</span>,<span class="dv">11</span>,<span class="dv">13</span>,<span class="dv">14</span>),<span class="sc">~</span><span class="fu">log10</span>(.))</span>
+<span id="cb14-103"><a href="#cb14-103" tabindex="-1"></a></span>
+<span id="cb14-104"><a href="#cb14-104" tabindex="-1"></a></span>
+<span id="cb14-105"><a href="#cb14-105" tabindex="-1"></a><span class="co">#scale the training set so its easier for the system to process the data in the regression model</span></span>
+<span id="cb14-106"><a href="#cb14-106" tabindex="-1"></a>train_set<span class="ot">&lt;-</span><span class="fu">data.frame</span>(<span class="fu">scale</span>(train.mice))</span>
+<span id="cb14-107"><a href="#cb14-107" tabindex="-1"></a><span class="co">#first model using all predictors</span></span>
+<span id="cb14-108"><a href="#cb14-108" tabindex="-1"></a>fit1 <span class="ot">=</span> <span class="fu">lm</span>(TARGET_WINS <span class="sc">~</span>., <span class="at">data =</span> train_set)</span>
+<span id="cb14-109"><a href="#cb14-109" tabindex="-1"></a><span class="fu">summary</span>(fit1)</span>
+<span id="cb14-110"><a href="#cb14-110" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow=</span><span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>))</span>
+<span id="cb14-111"><a href="#cb14-111" tabindex="-1"></a><span class="fu">plot</span>(fit1)</span>
+<span id="cb14-112"><a href="#cb14-112" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">fitted</span>(fit1),<span class="fu">residuals</span>(fit1),<span class="at">xlab=</span><span class="st">&quot;Fitted&quot;</span>,<span class="at">ylab=</span><span class="st">&quot;Residuals&quot;</span>)</span>
+<span id="cb14-113"><a href="#cb14-113" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">h=</span><span class="dv">0</span>)</span>
+<span id="cb14-114"><a href="#cb14-114" tabindex="-1"></a><span class="co">#Removing the largest outlier point we have a very similar R squared.</span></span>
+<span id="cb14-115"><a href="#cb14-115" tabindex="-1"></a>cook <span class="ot">&lt;-</span> <span class="fu">cooks.distance</span>(fit1)</span>
+<span id="cb14-116"><a href="#cb14-116" tabindex="-1"></a><span class="fu">halfnorm</span>(cook,<span class="dv">2</span>, <span class="at">ylab=</span><span class="st">&quot;Cook’s distances&quot;</span>)</span>
+<span id="cb14-117"><a href="#cb14-117" tabindex="-1"></a><span class="co">#first model using all predictors</span></span>
+<span id="cb14-118"><a href="#cb14-118" tabindex="-1"></a>fit1i <span class="ot">=</span> <span class="fu">lm</span>(TARGET_WINS <span class="sc">~</span>., <span class="at">data =</span> train_set, <span class="at">subset=</span>(cook <span class="sc">&lt;</span> <span class="fu">max</span>(cook)))</span>
+<span id="cb14-119"><a href="#cb14-119" tabindex="-1"></a><span class="fu">summary</span>(fit1i)</span>
+<span id="cb14-120"><a href="#cb14-120" tabindex="-1"></a><span class="co">#second model with just batting variables</span></span>
+<span id="cb14-121"><a href="#cb14-121" tabindex="-1"></a>fit2 <span class="ot">&lt;-</span> <span class="fu">lm</span>(TARGET_WINS <span class="sc">~</span> TEAM_BATTING_H <span class="sc">+</span> TEAM_BATTING_2B <span class="sc">+</span> TEAM_BATTING_3B <span class="sc">+</span> TEAM_BATTING_HR <span class="sc">+</span> TEAM_BATTING_BB <span class="sc">+</span> TEAM_BATTING_SO, <span class="at">data =</span> train_set)</span>
+<span id="cb14-122"><a href="#cb14-122" tabindex="-1"></a><span class="fu">summary</span>(fit2)</span>
+<span id="cb14-123"><a href="#cb14-123" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow=</span><span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>))</span>
+<span id="cb14-124"><a href="#cb14-124" tabindex="-1"></a><span class="fu">plot</span>(fit2)</span>
+<span id="cb14-125"><a href="#cb14-125" tabindex="-1"></a><span class="co">#third model with pitching and fielding variables</span></span>
+<span id="cb14-126"><a href="#cb14-126" tabindex="-1"></a>fit3 <span class="ot">&lt;-</span> <span class="fu">lm</span>(TARGET_WINS <span class="sc">~</span> TEAM_PITCHING_H <span class="sc">+</span> TEAM_PITCHING_HR <span class="sc">+</span> TEAM_PITCHING_BB <span class="sc">+</span> TEAM_PITCHING_SO <span class="sc">+</span> TEAM_FIELDING_E <span class="sc">+</span> TEAM_FIELDING_DP, <span class="at">data =</span> train_set)</span>
+<span id="cb14-127"><a href="#cb14-127" tabindex="-1"></a><span class="fu">summary</span>(fit3)</span>
+<span id="cb14-128"><a href="#cb14-128" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow=</span><span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>))</span>
+<span id="cb14-129"><a href="#cb14-129" tabindex="-1"></a><span class="fu">plot</span>(fit3)</span>
+<span id="cb14-130"><a href="#cb14-130" tabindex="-1"></a><span class="co">#data cleanup</span></span>
+<span id="cb14-131"><a href="#cb14-131" tabindex="-1"></a>test.c1 <span class="ot">&lt;-</span>test_set <span class="sc">%&gt;%</span></span>
+<span id="cb14-132"><a href="#cb14-132" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(INDEX,TEAM_BATTING_HBP,TEAM_BASERUN_CS)) <span class="co">#Filter dataset</span></span>
+<span id="cb14-133"><a href="#cb14-133" tabindex="-1"></a></span>
+<span id="cb14-134"><a href="#cb14-134" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span><span class="fu">complete</span>(<span class="fu">mice</span>(test.c1,<span class="at">method =</span> <span class="st">&quot;lasso.norm&quot;</span>,<span class="at">seed =</span> <span class="dv">333</span>)) <span class="co">#Using MICE</span></span>
+<span id="cb14-135"><a href="#cb14-135" tabindex="-1"></a></span>
+<span id="cb14-136"><a href="#cb14-136" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span>test.mice <span class="sc">%&gt;%</span></span>
+<span id="cb14-137"><a href="#cb14-137" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">STW_Ratio=</span>TEAM_PITCHING_SO<span class="sc">/</span>TEAM_BATTING_BB)</span>
+<span id="cb14-138"><a href="#cb14-138" tabindex="-1"></a></span>
+<span id="cb14-139"><a href="#cb14-139" tabindex="-1"></a><span class="co">#total bases=[H + 2B + (2 X 3B) + (3 X HR)].</span></span>
+<span id="cb14-140"><a href="#cb14-140" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span>test.mice<span class="sc">%&gt;%</span></span>
+<span id="cb14-141"><a href="#cb14-141" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">TB=</span>TEAM_BATTING_H<span class="sc">+</span>TEAM_BATTING_2B<span class="sc">+</span>(<span class="dv">2</span><span class="sc">*</span>TEAM_BATTING_3B)<span class="sc">+</span>(<span class="dv">3</span><span class="sc">*</span>TEAM_BATTING_HR))</span>
+<span id="cb14-142"><a href="#cb14-142" tabindex="-1"></a></span>
+<span id="cb14-143"><a href="#cb14-143" tabindex="-1"></a><span class="co">#X observations had NAs</span></span>
+<span id="cb14-144"><a href="#cb14-144" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span><span class="fu">na.omit</span>(test.mice)</span>
+<span id="cb14-145"><a href="#cb14-145" tabindex="-1"></a> </span>
+<span id="cb14-146"><a href="#cb14-146" tabindex="-1"></a>test.mice<span class="ot">&lt;-</span>test.mice<span class="sc">%&gt;%</span></span>
+<span id="cb14-147"><a href="#cb14-147" tabindex="-1"></a>  <span class="fu">mutate_at</span>(<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">8</span>,<span class="dv">10</span>,<span class="dv">12</span>,<span class="dv">13</span>),<span class="sc">~</span><span class="fu">log10</span>(.))</span>
+<span id="cb14-148"><a href="#cb14-148" tabindex="-1"></a></span>
+<span id="cb14-149"><a href="#cb14-149" tabindex="-1"></a>test_set<span class="ot">&lt;-</span><span class="fu">data.frame</span>(<span class="fu">scale</span>(test.mice))</span>
+<span id="cb14-150"><a href="#cb14-150" tabindex="-1"></a></span>
+<span id="cb14-151"><a href="#cb14-151" tabindex="-1"></a><span class="co">#predict</span></span>
+<span id="cb14-152"><a href="#cb14-152" tabindex="-1"></a>s.pred <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit1,<span class="at">new=</span>test_set)</span>
+<span id="cb14-153"><a href="#cb14-153" tabindex="-1"></a></span>
+<span id="cb14-154"><a href="#cb14-154" tabindex="-1"></a><span class="co"># backtransform scale:</span></span>
+<span id="cb14-155"><a href="#cb14-155" tabindex="-1"></a>(pred <span class="ot">&lt;-</span> s.pred <span class="sc">*</span> <span class="fu">sd</span>(train.mice<span class="sc">$</span>TARGET_WINS) <span class="sc">+</span> <span class="fu">mean</span>(train.mice<span class="sc">$</span>TARGET_WINS))</span></code></pre></div>
 </div>
 <div class="footnotes footnotes-end-of-document">
 <hr />
