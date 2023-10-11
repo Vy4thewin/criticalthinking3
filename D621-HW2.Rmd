@@ -70,7 +70,7 @@ accuracy<-function(a){
 #Realized question 11 wants this run all together
 ```
 
-###The classification error rate in the confusion matrix
+### The classification error rate in the confusion matrix
 
 The classification error is the rate of the model's 
 Using the classification error  formula below, let's calculate the error rate!
@@ -98,7 +98,7 @@ class.error<-function(a){
 ```
 
 
-###Precision in the confusion matrix
+### Precision in the confusion matrix
 
 Precision is the rate of positive predictions where identified correctly. The formula below is used in this rate.
 
@@ -158,6 +158,8 @@ specificity<-function(a){
 
 ### F1 score
   
+F1-Score is a measure of combining both precision and sensitivity. Its value ranges between 0 and 1, where the latter represents perfect precision and sensitivity in the model.
+  
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 f1.score<-function(a){
     #generating precision and sensitivity
@@ -173,8 +175,27 @@ f1.score<-function(a){
 ```
 
 #### Bounds of the F1 score
+  
+The F1-score is a harmonic mean. This means that it calculates the average of the ratios or rates by equalizing the weights. Because F1-Score is a ratio, it will always bound between 0 and 1. Below are some examples to demonstrate that is will always equal a value between 0 and 1.
+
+1. When precision = sensitivity
+```{r}
+
+```
 
 
+2. When precision = 0.1 to 1 and sensitivity = 1.0
+```{r}
+
+```
+
+
+3. When precision = 1.0 and sensitivity = 0.1 to 1
+```{r}
+
+```
+
+ 
 ### Plotting the ROC Curve
 
 ### Running all the created functions above
