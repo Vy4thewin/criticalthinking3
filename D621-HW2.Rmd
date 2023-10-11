@@ -22,9 +22,9 @@ data<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/ma
 
 ```
 
-##Classification metrics and the ROC curve
+## Classification metrics and the ROC curve
 
-###Creating the confusion matrix
+### Creating the confusion matrix
 
 For the confusion matrix, the table is a 2x2 matrix. The table's rows correspond with the predicted value of observation and the columns are the actual value of the observation. Looking at the confusion matrix, it appears 119 observation are predicted correctly out of the 181 observations
 
@@ -37,7 +37,7 @@ conf.matrix
 ```
 
 
-###Accuracy of the confusion matrix
+### Accuracy of the confusion matrix
 
 The accuracy of the prediction is given through the formula
 \(Accruacy=\frac{TP+TN}{TP+FP+TN+FN}\).
@@ -120,22 +120,57 @@ precisn<-function(a){
 ```
 
 ### Sensitivity
-
+  
+Sensitivity is the ratio of number of actual positives correctly predicted to the total number of actual positives.
+  
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
-
+sensitivity<-function(a){
+    #only grabbing positives from confusion matrix
+    fn<-a[1,2]
+    tp<-a[1,1]
+    
+    #using the formula provided
+    sen<-tp/(tp+fn)
+    sprintf("The Model's sensitivity is %.03f",sen)
+    return(sen)
+}
 
 ```
 
 
 ### Specificity 
-
+  
+Specificity is the ratio of number of actual True negatives to the total number of actual negatives.
+  
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
-
+specificity<-function(a){
+    #only grabbing positives from confusion matrix
+    fp<-a[2,1]
+    tn<-a[2,2]
+    
+    #using the formula provided
+    spe<-tn/(tn+fp)
+    sprintf("The Model's specificity is %.03f",spe)
+    return(spe)
+}
 
 ```
 
 ### F1 score
+  
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+f1.score<-function(a){
+    #generating precision and sensitivity
+    pre <- precisn(a)
+    sen <- sensitivity(a)
+    
+    #using the formula provided
+    score<-(2*pre*sen)/(pre+sen)
+    sprintf("The Model's f1 score is %.03f",score)
+    return(score)
+}
 
+```
 
 #### Bounds of the F1 score
 
