@@ -17,6 +17,7 @@ vignette: >
 library(tidyverse)
 library(caret)
 library(pROC)
+library(rlist)
 
 data<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/classification-output-data.csv",col_select=c("class","scored.class","scored.probability"))
 
@@ -121,7 +122,9 @@ precisn<-function(a){
 
 ### Sensitivity
   
-Sensitivity is the ratio of number of actual positives correctly predicted to the total number of actual positives.
+Sensitivity is the ratio of number of actual positives correctly predicted to the total number of actual positives.  
+
+\(sensitivity=\frac{TP}{TP+FN}\)
   
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 sensitivity<-function(a){
@@ -140,7 +143,9 @@ sensitivity<-function(a){
 
 ### Specificity 
   
-Specificity is the ratio of number of actual True negatives to the total number of actual negatives.
+Specificity is the ratio of number of actual True negatives to the total number of actual negatives.  
+
+\(specificity=\frac{TN}{TN+FP}\)
   
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 specificity<-function(a){
@@ -158,7 +163,9 @@ specificity<-function(a){
 
 ### F1 score
   
-F1-Score is a measure of combining both precision and sensitivity. Its value ranges between 0 and 1, where the latter represents perfect precision and sensitivity in the model.
+F1-Score is a measure of combining both precision and sensitivity. Its value ranges between 0 and 1, where the latter represents perfect precision and sensitivity in the model.  
+  
+\(F1  Score=2*\frac{Precision*Sensitivity}{Precision+Sensitivity}\)
   
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 f1.score<-function(a){
@@ -178,20 +185,51 @@ f1.score<-function(a){
   
 The F1-score is a harmonic mean. This means that it calculates the average of the ratios or rates by equalizing the weights. Because F1-Score is a ratio, it will always bound between 0 and 1. Below are some examples to demonstrate that is will always equal a value between 0 and 1.
 
+```{r}
+#Create lists with precision and sensitivity values
+prec_lst <- seq(0.1, 1, by=0.1)
+sens_lst <- seq(0.1, 1, by=0.1)
+```
+
 1. When precision = sensitivity
 ```{r}
+f1_scrs <- c()
+
+for (i in prec_lst) {
+  res <- 2*i*i/(i+i)
+  f1_scrs <- c(f1_scrs, res)
+}
+
+print(f1_scrs)
+
 
 ```
 
 
 2. When precision = 0.1 to 1 and sensitivity = 1.0
 ```{r}
+f1_scrs <- c()
+
+for (i in prec_lst) {
+  res <- 2*i*1/(i+1)
+  f1_scrs <- c(f1_scrs, res)
+}
+
+print(f1_scrs)
 
 ```
 
 
 3. When precision = 1.0 and sensitivity = 0.1 to 1
 ```{r}
+f1_scrs <- c()
+
+for (i in sens_lst) {
+  res <- 2*1*i/(1+i)
+  f1_scrs <- c(f1_scrs, res)
+}
+
+print(f1_scrs)
 
 ```
 
