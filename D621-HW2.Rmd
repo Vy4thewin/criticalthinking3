@@ -107,7 +107,7 @@ Precision is the rate of positive predictions where identified correctly. The fo
 
 \(Precision=\frac{TP}{TP+FP}\)
 
-The model has a ~96% accuracy in correctly predicting positives.
+The model has a ~79% accuracy in correctly predicting positives.
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 precisn<-function(a){
