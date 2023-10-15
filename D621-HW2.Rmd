@@ -17,11 +17,13 @@ vignette: >
 library(tidyverse)
 library(caret)
 library(pROC)
-library(rlist)
 
 data<-read_csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/classification-output-data.csv",col_select=c("class","scored.class","scored.probability"))
-
 ```
+
+## Introduction
+
+For this analysis, the objective is create functions in R to carry out various classification metrics. We will also be investigating functions from packages in R that can produce the equivalent results. Lastly, we will be creating a graphical output that can also be used to evaluate the output of classification models, such as binary logistic regression.
 
 ## Classification metrics and the ROC curve
 
@@ -122,9 +124,7 @@ precisn<-function(a){
 
 ### Sensitivity
   
-Sensitivity is the ratio of number of actual positives correctly predicted to the total number of actual positives.  
-
-\(sensitivity=\frac{TP}{TP+FN}\)
+Sensitivity is the ratio of number of actual positives correctly predicted to the total number of actual positives.
   
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 sensitivity<-function(a){
@@ -137,15 +137,12 @@ sensitivity<-function(a){
     sprintf("The Model's sensitivity is %.03f",sen)
     return(sen)
 }
-
 ```
 
 
 ### Specificity 
   
-Specificity is the ratio of number of actual True negatives to the total number of actual negatives.  
-
-\(specificity=\frac{TN}{TN+FP}\)
+Specificity is the ratio of number of actual True negatives to the total number of actual negatives.
   
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 specificity<-function(a){
@@ -158,14 +155,11 @@ specificity<-function(a){
     sprintf("The Model's specificity is %.03f",spe)
     return(spe)
 }
-
 ```
 
 ### F1 score
   
-F1-Score is a measure of combining both precision and sensitivity. Its value ranges between 0 and 1, where the latter represents perfect precision and sensitivity in the model.  
-  
-\(F1  Score=2*\frac{Precision*Sensitivity}{Precision+Sensitivity}\)
+F1-Score is a measure of combining both precision and sensitivity. Its value ranges between 0 and 1, where the latter represents perfect precision and sensitivity in the model.
   
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 f1.score<-function(a){
@@ -178,63 +172,86 @@ f1.score<-function(a){
     sprintf("The Model's f1 score is %.03f",score)
     return(score)
 }
-
 ```
 
 #### Bounds of the F1 score
   
 The F1-score is a harmonic mean. This means that it calculates the average of the ratios or rates by equalizing the weights. Because F1-Score is a ratio, it will always bound between 0 and 1. Below are some examples to demonstrate that is will always equal a value between 0 and 1.
 
-```{r}
-#Create lists with precision and sensitivity values
-prec_lst <- seq(0.1, 1, by=0.1)
-sens_lst <- seq(0.1, 1, by=0.1)
-```
-
 1. When precision = sensitivity
 ```{r}
-f1_scrs <- c()
-
-for (i in prec_lst) {
-  res <- 2*i*i/(i+i)
-  f1_scrs <- c(f1_scrs, res)
-}
-
-print(f1_scrs)
-
-
+precision_equal_sensitivity <- 0.5  
+f1_score_equal_precision_sensitivity <- 2 * (precision_equal_sensitivity * precision_equal_sensitivity) / (precision_equal_sensitivity + precision_equal_sensitivity)
+sprintf("When precision = sensitivity, F1 Score = %.03f", f1_score_equal_precision_sensitivity)
 ```
 
 
 2. When precision = 0.1 to 1 and sensitivity = 1.0
 ```{r}
-f1_scrs <- c()
-
-for (i in prec_lst) {
-  res <- 2*i*1/(i+1)
-  f1_scrs <- c(f1_scrs, res)
-}
-
-print(f1_scrs)
-
+precisions <- seq(0.1, 1.0, by = 0.1)
+sensitivity_fixed <- 1.0  # Sensitivity is fixed at 1.0
+f1_scores_varying_precision <- (2 * precisions * sensitivity_fixed) / (precisions + sensitivity_fixed)
+cat("F1 Scores when precision varies with sensitivity fixed at 1.0:\n")
+print(f1_scores_varying_precision)
 ```
-
 
 3. When precision = 1.0 and sensitivity = 0.1 to 1
 ```{r}
-f1_scrs <- c()
-
-for (i in sens_lst) {
-  res <- 2*1*i/(1+i)
-  f1_scrs <- c(f1_scrs, res)
-}
-
-print(f1_scrs)
-
+sensitivities <- seq(0.1, 1.0, by = 0.1)
+precision_fixed <- 1.0  # Precision is fixed at 1.0
+f1_scores_varying_sensitivity <- (2 * precision_fixed * sensitivities) / (precision_fixed + sensitivities)
+cat("F1 Scores when sensitivity varies with precision fixed at 1.0:\n")
+print(f1_scores_varying_sensitivity)
 ```
 
  
 ### Plotting the ROC Curve
+
+```{r}
+generateROC <- function(true_class, predicted_prob) {
+  thresholds <- seq(0, 1, by = 0.01)
+  sensitivity <- numeric(length(thresholds))
+  specificity <- numeric(length(thresholds))
+  
+  for (i in 1:length(thresholds)) {
+    threshold <- thresholds[i]
+    predicted_class <- ifelse(predicted_prob >= threshold, 1, 0)
+    
+    # Calculate TP, TN, FP, and FN
+    TP <- sum(predicted_class == 1 & true_class == 1)
+    TN <- sum(predicted_class == 0 & true_class == 0)
+    FP <- sum(predicted_class == 1 & true_class == 0)
+    FN <- sum(predicted_class == 0 & true_class == 1)
+    
+    sensitivity[i] <- TP / (TP + FN)
+    specificity[i] <- TN / (TN + FP)
+  }
+  
+  # Create an ROC curve object (you can keep this part from your original code)
+  roc_curve <- roc(true_class, predicted_prob)
+  
+  # Plot ROC Curve (you can keep this part from your original code)
+  plot(roc_curve, main = "ROC Curve")
+  
+  # Calculate AUC (you can keep this part from your original code)
+  auc_value <- auc(roc_curve)
+  
+  # Create a list containing the ROC curve plot and AUC value
+  result_list <- list(ROC_Curve = roc_curve, AUC = auc_value)
+  
+  return(result_list)
+}
+
+
+roc_result <- generateROC(data$class, data$scored.probability)
+
+# Access ROC curve and AUC values
+roc_plot <- roc_result$ROC_Curve
+auc_value <- roc_result$AUC
+cat("AUC (Area Under the Curve):", auc_value, "\n")
+```
+
+
 
 ### Running all the created functions above
 
@@ -250,4 +267,30 @@ pr<-precisn(conf.matrix)
 
 ### Investigating the caret package in comparsion to metrics above
 
+```{r}
+# convert columns to factors to run function
+data$class <- as.factor(data$class)
+data$scored.class <- as.factor(data$scored.class)
+
+# Assuming your dataset is named 'data' with 'class' and 'scored.class' columns
+conf_matrix_caret <- confusionMatrix(data$scored.class, data$class)
+
+# Print the confusion matrix and other classification metrics
+print(conf_matrix_caret)
+```
+
+
 ### Investigating the PROC package in comparsion of the ROC
+
+```{r}
+roc_data <- roc(data$class, data$scored.probability)
+
+# Plot the ROC curve
+plot(roc_data, print.auc = TRUE)
+```
+
+```{r}
+# Get the AUC
+auc_value <- auc(roc_data)
+sprintf("AUC: %.03f", auc_value)
+```
