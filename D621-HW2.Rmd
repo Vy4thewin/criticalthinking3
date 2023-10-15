@@ -46,21 +46,21 @@ The accuracy of the prediction is given through the formula
 \(Accruacy=\frac{TP+TN}{TP+FP+TN+FN}\).
 
 In order to perform the formula, we will need the terms below from the confusion matrix.
-*Terms
+* Terms
   +TP=True Positive
   +TN=True Negative
   +FN=False Negative
   +FP=False Positive
   
-Looking at our confusion matrix: True Positive is located at [1,1], True Negative is located at [2,2], False Negative located at [1,2], and False Positive located at [2,1].
+Looking at our confusion matrix: True Positive is located at [1,1], True Negative is located at [2,2], False Negative located at [2,1], and False Positive located at [1,2].
 
 When the confusion matrix enter the functions, its accuracy score was ~80%. The model predicted correctly on the observations 80% of probability time. There is not a background on the data set provided if 80% accuracy is appropriate probability.
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 accuracy<-function(a){
   #grabbing values from imported data set
-  fp<-a[2,1]
-  fn<-a[1,2]
+  fp<-a[1,2]
+  fn<-a[2,1]
   tp<-a[1,1]
   tn<-a[2,2]  
 
@@ -85,8 +85,8 @@ The model saw a classification error of ~19%. Adding the accuracy score and the 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 class.error<-function(a){
   #same terms uses above
-  fp<-a[2,1]
-  fn<-a[1,2]
+  fp<-a[1,2]
+  fn<-a[2,1]
   tp<-a[1,1]
   tn<-a[2,2] 
   
@@ -112,7 +112,7 @@ The model has a ~96% accuracy in correctly predicting positives.
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 precisn<-function(a){
     #only grabbing positives from confusion matrix
-    fp<-a[2,1]
+    fp<-a[1,2]
     tp<-a[1,1]
     
     #using the formula provided
@@ -129,7 +129,7 @@ Sensitivity is the ratio of number of actual positives correctly predicted to th
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 sensitivity<-function(a){
     #only grabbing positives from confusion matrix
-    fn<-a[1,2]
+    fn<-a[2,1]
     tp<-a[1,1]
     
     #using the formula provided
@@ -147,7 +147,7 @@ Specificity is the ratio of number of actual True negatives to the total number 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 specificity<-function(a){
     #only grabbing positives from confusion matrix
-    fp<-a[2,1]
+    fp<-a[1,2]
     tn<-a[2,2]
     
     #using the formula provided
@@ -242,13 +242,6 @@ generateROC <- function(true_class, predicted_prob) {
   return(result_list)
 }
 
-
-roc_result <- generateROC(data$class, data$scored.probability)
-
-# Access ROC curve and AUC values
-roc_plot <- roc_result$ROC_Curve
-auc_value <- roc_result$AUC
-cat("AUC (Area Under the Curve):", auc_value, "\n")
 ```
 
 
@@ -256,16 +249,27 @@ cat("AUC (Area Under the Curve):", auc_value, "\n")
 ### Running all the created functions above
 
 ```{r}
-acc<-accuracy(conf.matrix)
-c.error<-class.error(conf.matrix)
-pr<-precisn(conf.matrix)
+#Running all the functions above in one statement
+accuracy(conf.matrix)
+class.error(conf.matrix)
+precisn(conf.matrix)
+sensitivity(conf.matrix)
+specificity(conf.matrix)
 
-#[will need to add calls to the other function and a plotROC]
+#plotting the ROC Curve
+roc_result <- generateROC(data$class, data$scored.probability)
 
+# Access ROC curve and AUC values
+roc_plot <- roc_result$ROC_Curve
+auc_value <- roc_result$AUC
+cat("AUC (Area Under the Curve):", auc_value, "\n")
 
 ```
 
 ### Investigating the caret package in comparsion to metrics above
+
+
+Using the caret package below, we noticed specificity and sensitivity are closely matching to the values seen in the caret package. The confusion matrix is the same as the created matrix above as well.
 
 ```{r}
 # convert columns to factors to run function
@@ -281,6 +285,8 @@ print(conf_matrix_caret)
 
 
 ### Investigating the PROC package in comparsion of the ROC
+
+The created ROC function and pROC function for the ROC Curves look identicial with their AUC curves matches as well.
 
 ```{r}
 roc_data <- roc(data$class, data$scored.probability)
