@@ -1,0 +1,97 @@
+---
+title: "Data 621 Homework 3"
+author: "Critical Thinking Group 3: Vyannna Hill, Jose Rodriguez, and Christian Uriostegui"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+```{r warning=FALSE, include=FALSE}
+#importing data sets
+library(tidyverse)
+library(ggpubr)
+library(corrplot)
+
+training_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/crime-training-data_modified.csv")
+testing_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/crime-evaluation-data_modified.csv")
+```
+
+
+### Data Exploration
+
+#### Introduction to the data set
+
+For this assignment, the team will review the crime data set. The team will create a regression model that will predict the risk assessment of a particular neighborhood.
+
+Let's review the data below:
+
+Variable Name | Definition | Value
+------------- | ------------- | -----------|
+zn | proportion of residential land zoned for large lots (over 25000 square feet)|predictor variable
+indus| proportion of non-retail business acres per suburb| predictor variable
+chas| a dummy var. for whether the suburb borders the Charles River (1) or not (0)|predictor variable
+nox| nitrogen oxides concentration (parts per 10 million)| predictor variable
+rm |average number of rooms per dwelling| predictor variable
+age| proportion of owner-occupied units built prior to 1940| predictor variable
+dis| weighted mean of distances to five Boston employment centers| predictor variable
+rad| index of accessibility to radial highways| predictor variable
+tax| full-value property-tax rate per $10,000 |predictor variable
+ptratio| pupil-teacher ratio by town |predictor variable
+lstat| lower status of the population (percent) |predictor variable
+medv| median value of owner-occupied homes in $1000s |predictor variable
+target| whether the crime rate is above the median crime rate (1) or not (0)|response variable
+
+Reviewing the training set, the data set has 466 observations and 12 predictor variables in the data set. There is no missing values in the training set, so there is no further steps on imputation. However, the mean and median of a few variables below look strange. Let's review a visualization of the distribution of the values below.
+
+
+```{r warning=FALSE}
+#count of training set
+sprintf("Number of observations: %1.f",count(training_data))
+
+#summary of the data set
+summary(training_data)
+
+#doubling checking there's no NAs
+colSums(is.na(training_data))
+```
+#### Running into heavily skewed data
+
+Looking into the density plots of the predictor variables, only the average number of rooms variable has a normal distribution. For the variable "zn", the data is very right skewed. This can represent this location does not have a lot of large residential plots; which could mean the area does not see larger apartments or luxury houses. 
+
+Another questionable variable is "rad", which is the index of accessibility to radial highway. This definition measures the dependence of a car in a location^(https://www.sciencedirect.com/science/article/pii/S0966692323000388). The scoring of rad in this data set ranks this location to be poorly accessible as majority of the observations ranks accessibility at 25.
+
+Possible paths for the heavily skewed may need a transformation, but let's see if there are predictors that are multi-collinear that can removed pre-transformation!
+
+```{r}
+#Look at the distribution of all predictor variables
+g1<-training_data%>%ggplot(aes(x=zn))+geom_histogram(bins=25)+theme_classic()
+g2<-training_data%>%ggplot(aes(x=indus))+geom_histogram(bins=25)+theme_classic()
+g3<-training_data%>%ggplot(aes(x=chas))+geom_histogram(bins=25)+theme_classic()
+g4<-training_data%>%ggplot(aes(x=nox))+geom_histogram(bins=25)+theme_classic()
+g5<-training_data%>%ggplot(aes(x=rm))+geom_histogram(bins=25)+theme_classic()
+g6<-training_data%>%ggplot(aes(x=age))+geom_histogram(bins=25)+theme_classic()
+g7<-training_data%>%ggplot(aes(x=dis))+geom_histogram(bins=25)+theme_classic()
+g8<-training_data%>%ggplot(aes(x=rad))+geom_histogram(bins=25)+theme_classic()
+g9<-training_data%>%ggplot(aes(x=tax))+geom_histogram(bins=25)+theme_classic()
+g10<-training_data%>%ggplot(aes(x=ptratio))+geom_histogram(bins=25)+theme_classic()
+g11<-training_data%>%ggplot(aes(x=lstat))+geom_histogram(bins=25)+theme_classic()
+g12<-training_data%>%ggplot(aes(x=medv))+geom_histogram(bins=25)+theme_classic()
+ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12,nrow = 3,ncol = 4)
+```
+
+#### Reviewing for multi-collinearity 
+
+In review of our predictor variables, rad and tax have a high correlation of 0.91 compared to other variables. The team can remove rad variable from the preliminary regression model as tax variable requires less transformations. There are some moderately correlated variables in the graph below (i.e nox&dis,indus&nox), but the team can investigate in model building if variable removal is necessary. 
+
+```{r}
+#checking for multi-collinearity 
+corrplot(cor(training_data[,1:12]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
+
+```
+### Data Preparation 
+
+### Build Models
+
+### Select Models
