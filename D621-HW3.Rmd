@@ -10,6 +10,7 @@ output:
 
 ```{r warning=FALSE, include=FALSE}
 #importing data sets
+library(MASS)
 library(tidyverse)
 library(ggpubr)
 library(corrplot)
@@ -43,7 +44,7 @@ lstat| lower status of the population (percent) |predictor variable
 medv| median value of owner-occupied homes in $1000s |predictor variable
 target| whether the crime rate is above the median crime rate (1) or not (0)|response variable
 
-Reviewing the training set, the data set has 466 observations and 12 predictor variables in the data set. There is no missing values in the training set, so there is no further steps on imputation. However, the mean and median of a few variables below look strange. Let's review a visualization of the distribution of the values below.
+Reviewing the training set, the data set has 466 observations and 12 predictor variables in the data set. There is no missing values in the training set, so there is no further steps on imputation. However, the mean and median of a few variables below look strange. Let's review a visualization of the distribution of those values below.
 
 
 ```{r warning=FALSE}
@@ -62,7 +63,7 @@ Looking into the density plots of the predictor variables, only the average numb
 
 Another questionable variable is "rad", which is the index of accessibility to radial highway. This definition measures the dependence of a car in a location^(https://www.sciencedirect.com/science/article/pii/S0966692323000388). The scoring of rad in this data set ranks this location to be poorly accessible as majority of the observations ranks accessibility at 25.
 
-Possible paths for the heavily skewed may need a transformation, but let's see if there are predictors that are multi-collinear that can removed pre-transformation!
+Possible paths for the heavily skewed may need a transformation, but let's see if there are predictors that are multi-collinear that can be  removed pre-transformation!
 
 ```{r}
 #Look at the distribution of all predictor variables
@@ -91,6 +92,59 @@ corrplot(cor(training_data[,1:12]),method = "number",type="lower", tl.srt = .71,
 
 ```
 ### Data Preparation 
+
+From the data exploration, it was found a few features are heavily skewed. However, this is a logistic model and not a linear model. There is no assumption of a normal distribution like a linear regression model will assume.
+
+* The assumptions for a logistic regression are...
+  + No Multi-collinearity 
+  + residuals are independent
+  + large sample size
+  + linear relationship between predictors and logit of Y
+  
+  
+The most useful transformation is handling the highly skewed features for the model.
+
+Zn, tax, pratio, nox, and indus will need transformations before the feature selection. ZN is very fragment in its distribution, so it might benefit from a polynomial transformation. It is a quicker transformation than creating dummy variables for all quartiles in zn.
+
+```{r}
+#Creating a polynomial term from zn for a more stable predictor variable
+train.set<-training_data%>%mutate_at(c(1),~poly(.,2))
+
+#seeing the difference in distribution
+g1<-training_data%>%ggplot(aes(x=zn))+geom_density()+theme_classic()
+g2<-train.set%>%ggplot(aes(x=zn[,"2"]))+geom_density()+theme_classic()
+ggarrange(g1,g2)
+
+```
+
+We can determine the other feature's transformation through box cox!
+
+```{r}
+#Performing box cox on the predictors and retrieving their lambdas
+lamb.indus<-boxcox(training_data$indus~1)
+lamb.nox<-boxcox(training_data$nox~1)
+lamb.pratio<-boxcox(training_data$ptratio~1)
+lamb.tax<-boxcox(training_data$tax~1)
+
+lamb.indus<-lamb.indus$x[which.max(lamb.indus$y)]
+lamb.nox<-lamb.nox$x[which.max(lamb.nox$y)]
+lamb.pratio<-lamb.pratio$x[which.max(lamb.pratio$y)]
+lamb.tax<-lamb.tax$x[which.max(lamb.tax$y)]
+
+#indus is near .5 so it will need sqrt(x)
+train.set<-train.set%>%mutate(indus=sqrt(indus))
+
+#nox is near -1 so it will get 1/x
+train.set<-train.set%>%mutate(nox=1/nox)
+
+#pratio will be ploy like zn
+train.set<-train.set%>%mutate(ptratio=poly(ptratio,2))
+
+#tax will get 1/ sqrt(x)
+train.set<-train.set%>%mutate(tax=1/sqrt(tax))
+```
+
+Now, the team can use the newly transform variables in the variable selection process!
 
 ### Build Models
 
