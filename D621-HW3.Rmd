@@ -1,4 +1,4 @@
----
+ ---
 title: "Data 621 Homework 3"
 author: "Critical Thinking Group 3: Vyannna Hill, Jose Rodriguez, and Christian Uriostegui"
 date: "`r Sys.Date()`"
@@ -14,6 +14,7 @@ library(MASS)
 library(tidyverse)
 library(ggpubr)
 library(corrplot)
+library(broom)
 
 training_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/crime-training-data_modified.csv")
 testing_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/crime-evaluation-data_modified.csv")
@@ -148,4 +149,94 @@ Now, the team can use the newly transform variables in the variable selection pr
 
 ### Build Models
 
+In all three models, we're going to assigning the variable target as our dependent value, and every other variable as our predictors. We want to see what variables, such as zn, indicus, and chas, have on target. Target tells us whether the crime rate in the area is high or low. If a coefficient is positive, this tell us that the higher the value of the variable, the higher the odds of Target to be 1 - which tell us the crime rate in the area is high. The opposite occurs when coefficient is negative. 
+
+
+
+### Model Fit 1: Full Baseline Model
+
+Our residuals in the baseline model, which contains the original dataset without modifications, ranges from -1.8464 to 3.4665.
+
+*Positive variables*
+The variables chas, and lstat have positive coefficients. The higher these values, the higher the chances that the crime rate in the area is high. In other words if the area is near the Charles River,  or if there is a higher concentration of population that is on the lower end of socio economic status, they will likely be in a high crime rate area. These variables are not statistically significant. 
+
+The coefficients align with what we assume to be key identifiers of the crime rate of the area. While we are unsure why the Charles River has a positive coefficient, one can assume the it's likely going to be a high crime area.If there is a high concentration of poverty, then there will most likely be crime and so the positive coefficient for lstat also makes sense. 
+
+*Negative variables*
+The variables zn, indus, and rm have negative coefficients. The higher these values, the lower the chances that the crime rate in the area is high. If the proportion of residential land zoned for large lots is large, if the proportion of non-retail business acres per suburb is large, or if the average number of rooms per dwelling is large then the more likely they will be in a low crime rate area, These variables are not statistically significant  
+
+These variables aren't as intuitive as when looking at the variables with positive coefficients. This tells us that areas with larger residential zoning (more open space), areas with non-retail businesses (local businesses) and average rooms, the more likely there will be a low crime area. These amenities likely offer more economic opportunities (jobs), more space and are most probable of being occupant by affluent families  
+
+*Significant values*
+The variables nox, age, dis, rad, ptratio, medv and tax are all statistically significant. 
+
+If there is high population (nox), if the building is older (age), if there isn't close proximity to employment centers (dis), if there is close proximity to highways (rad) and high pupil to teacher ration (ptratio) the higher the chances that the crime rate in the area is high. The positive values of these coefficients is fitting because these values indicate negative enviornmental status, and weak economic opportunity, all which typically exist in high crime areas.
+
+Areas with higher property taxes are less likely to be an area with high crime rate.
+
+*AIC and BIC* 
+
+The AIC for this model is 218.0469 and the BIC is 271.9213
+
+```{r, echo=FALSE}
+# Baseline model
+fit1 <- glm(target ~ ., data = training_data, family = "binomial")
+
+summary(fit1)
+```
+
+```{r, echo=FALSE}
+glance(fit1)
+```
+
+### Model Fit 2: Full Transformed Model
+
+When comparing the transformed model to the baseline model, we can see a wider range when looking at the residuals. 
+Model 2 ranged from -1.7292 to 3.7084.
+
+Similarly we can see most of the same significant variables that we see in model 1: nox, dis, rad, ptratio2, and medv
+Tax is not statistically significant in this model. 
+
+Interestingly, the nox variable in this model is negative coefficient value unlike the first model which was a positive coefficient value.
+
+The AIC is 220.1605 and BIC is 282.3232 which is slightly larger than the first model. This indicates the first model is a better fit.
+
+```{r, echo=FALSE}
+# Our second logistic regression model with transformed variables
+fit2 <- glm(target ~ ., data = train.set, family = "binomial")
+
+# Summary of the second model
+summary(fit2)
+```
+
+```{r, echo=FALSE}
+glance(fit2)
+```
+
+### Model Fit 3: Stepwise Regression Model
+
+For the final model, we utilize stepwise regression. This is a technique that seeks a parsimonius model, rather than one with a large selection of predictor values. It contains both forward selection and backward elimnation. Forward selection starts with no variables and then adds them one by one. It only adds variables that give the most improvement based on the F-statistic. Backward elimination starts with all the predictors in the model and then constantly iterates to remove the least significant variables until only the most significant predictors remain. 
+
+All the significant variables from model 1 are in model 3: zn, nox, age, dis, rad, tax, ptratio, medv 
+
+We see the absence of variables such as indus, chas and lstat.
+
+We can also see the AIC of 215.3229 and BIC of 252.6205 is lowest amongst all models, making this the most ideal model.
+
+```{r, echo=FALSE}
+# The third model with stepwise regression
+fit3 <- stepAIC(fit1, direction = "both", trace = FALSE)
+
+# Summary of the third model
+summary(fit3)
+```
+
+```{r, echo=FALSE}
+glance(fit3)
+```
+
 ### Select Models
+
+
+
+
