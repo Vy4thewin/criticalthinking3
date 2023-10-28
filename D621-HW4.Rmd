@@ -1,0 +1,255 @@
+---
+title: "Data 621 Homework 4"
+author: "Critical Thinking Group 3: Vyannna Hill, Jose Rodriguez, and Christian Uriostegui"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+```{r warning=FALSE, include=FALSE}
+#importing data sets
+library(tidymodels)
+library(rpart)
+library(tidyverse)
+library(ggpubr)
+library(mice)
+library(corrplot)
+
+training_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/insurance_training_data.csv")
+testing_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/insurance-evaluation-data.csv")
+```
+
+
+### Data Exploration
+
+This assignment is a exploration of the insurance data set. The tasks are finding the optimal models for predicting if the insured driver will be involved in a car crash and estimating the value of the insurance payout.
+
+#### Looking into the insurance data set
+
+Reviewing the data set below, there are 8,161 insured drivers apart of the data set. There are a few categorical variables: Parent1, Mstat, Sex, education, Job, cartype, caruse, redcar, revoked, and urbancity.
+
+For the modeling, we will need these categorical variables to be numeric to run in our model. Let's review which variables can be updated into binary and which will need new multiple columns for dummy variables. It is noted that education, Job, and Car Type have multiple options so its dummy variables will be k-1.
+
+
+In addition, there will need to be some transformations of a few non categorical variables. The values income, home val, blue book, and old claim will need to be re-define as numeric values for the regression.
+
+```{r warning=FALSE}
+#summary of the data set
+summary(training_data)
+
+#Seeing the unique categorical values
+col<-training_data%>%select(PARENT1,MSTATUS,SEX,EDUCATION,JOB,CAR_USE,CAR_TYPE,RED_CAR,REVOKED,URBANICITY )
+lapply(col, unique)
+```
+
+#### Checking for NAs and non-normal data
+
+Besides the needed transformations above, let's see if there are any missing values with the current data set. It is found that YOJ (Years on the Job), car age, and age have some missing values. The team will have to use imputation for those missing values.
+
+```{r}
+#checking for Na values
+colSums(is.na(training_data))
+```
+
+Next, the examination of the predictor variables for both linear and logistic regressions. For the linear regression, the predictor variables must pass with a linear relationship with the response variable (the targeted amount) in order to create the model.
+
+
+Looking at the visual representation of their relationships below, there is a lot of non normality in the predictor values. The predictor values kids Driving, kids at home, time in force, motor vehicle points, and claim frequency resemble a linear relationship. 
+
+It can be interpreted that the claim amount lessens for the variables mentioned above. One call out is there are a few outliers in the variables (i.e claim frequency and mvp) that will need to be checked if they are influential points. Another call out is the fan shape seen in a few scatter plots below. These predictors will need a transformation to correct the heteroscedasticity seen through the fan shape appearance.
+
+```{r warning=FALSE}
+#Checking for linear assumption below
+g1<-ggplot(training_data,aes(x=KIDSDRIV,y=TARGET_AMT))+geom_point()+labs(title = "KIDS DRIVING VS TARGETED AMOUNT",x="# OF DRIVING KIDS",y="TARGETED AMOUNT")+theme_classic()
+g2<-ggplot(training_data,aes(x=AGE,y=TARGET_AMT))+geom_point()+labs(title = "AGE VS TARGETED AMOUNT",x="AGE OF DRIVER",y="TARGETED AMOUNT")+theme_classic()
+g3<-ggplot(training_data,aes(x=HOMEKIDS,y=TARGET_AMT))+geom_point()+labs(title = "KIDS AT HOME VS TARGETED AMOUNT",x="# OF KIDS AT HOME",y="TARGETED AMOUNT")+theme_classic()
+g4<-ggplot(training_data,aes(x=YOJ,y=TARGET_AMT))+geom_point()+labs(title = "# YRS ON THE JOB VS TARGETED AMOUNT",x="# OF YEARS",y="TARGETED AMOUNT")+theme_classic()
+g5<-ggplot(training_data,aes(x=TRAVTIME,y=TARGET_AMT))+geom_point()+labs(title = "TRAVEL TIME VS TARGETED AMOUNT",x="TRAVEL TIME",y="TARGETED AMOUNT")+theme_classic()
+g6<-ggplot(training_data,aes(x=TIF,y=TARGET_AMT))+geom_point()+labs(title = "TIME IN FORCE VS TARGETED AMOUNT",x="TIME IN FORCE",y="TARGETED AMOUNT")+theme_classic()
+g7<-ggplot(training_data,aes(x=MVR_PTS,y=TARGET_AMT))+geom_point()+labs(title = "MOTOR VEHICLE POINTS VS TARGETED AMOUNT",x="# OF POINTS",y="TARGETED AMOUNT")+theme_classic()
+g8<-ggplot(training_data,aes(x=CLM_FREQ,y=TARGET_AMT))+geom_point()+labs(title = "CLAIM FREQUENCY VS TARGETED AMOUNT",x="# OF CLAIMS",y="TARGETED AMOUNT")+theme_classic()
+g9<-ggplot(training_data,aes(x=CAR_AGE,y=TARGET_AMT))+geom_point()+labs(title = "CAR AGE VS TARGETED AMOUNT",x="CAR AGE",y="TARGETED AMOUNT")+theme_classic()
+ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,ncol =3 ,nrow =3)
+
+```
+
+It is apparent in the density distributions plotted below the non-normalness.
+```{r warning=FALSE}
+#gathering a view on the current numeric variables available
+#Definitely will need to revisit spent cols after transformations
+g1<-ggplot(data=training_data,aes(x=KIDSDRIV))+geom_density()+theme_classic()
+g2<-ggplot(data=training_data,aes(x=AGE))+geom_density()+theme_classic()
+g3<-ggplot(data=training_data,aes(x=HOMEKIDS))+geom_density()+theme_classic()
+g4<-ggplot(data=training_data,aes(x=YOJ))+geom_density()+theme_classic()
+g5<-ggplot(data=training_data,aes(x=TRAVTIME))+geom_density()+theme_classic()
+g6<-ggplot(data=training_data,aes(x=TIF))+geom_density()+theme_classic()
+g7<-ggplot(data=training_data,aes(x=MVR_PTS))+geom_density()+theme_classic()
+g8<-ggplot(data=training_data,aes(x=CLM_FREQ))+geom_density()+theme_classic()
+g9<-ggplot(data=training_data,aes(x=CAR_AGE))+geom_density()+theme_classic()
+ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,ncol =3 ,nrow =3)
+```
+
+### Data Preparation
+
+There is a list of tasks in order to begin the modeling process. The team will need to address the missing data, the categorical variables, checking column value types, and the transformations towards near normal.
+
+
+#### Redefine Cost Variables
+
+The team noticed the cost variables income, home val, blue book, and old claim pulled as categorical. Let's transform them back into numeric values like targeted amount with the transformation below. The team did noticed after the transformation, some values of income and home value were missing. This can lead towards our second task!
+
+```{r}
+#Removing index 
+train.clean<-training_data%>%select(-(INDEX))
+
+#converting the spend columns back to numeric
+train.clean<-train.clean%>%mutate_at(c("INCOME","HOME_VAL","BLUEBOOK","OLDCLAIM"),~parse_number(.))
+```
+
+
+#### Filling in the Missing
+
+In the data exploration, the team noticed some missing values that will need to be filled. To avoid any bias in the imputed data, lets use MICE to impute the data. This imputation fills the missing data with the predicted value .
+
+Now, the data set is filled with all numeric values. Let's move onto the transformation of the categorical variables!
+
+```{r message=FALSE, include=FALSE}
+#Using MICE to impute missing values, using pmm to avoid neg impute values
+train.clean<-complete(mice(train.clean,method = "pmm",seed = 333))
+
+#Doubling checking no NAs arise from imputation 
+colSums(is.na(train.clean))
+```
+
+#### Transforms towards dummy variables
+
+To use the categorical variables, there will need to a transformation into dummy variables. All dummy variables will take the form K-1, which K is the number of unique values in the variable. For Parents, martial status, sex, car use, red car, revoked, and urban city it's assigning a binary true/false.
+
+* Dictionary 
+  + False==0
+  + True==1
+
+For job, education and car type the dummy variables will need multiple columns. For example, car type will need the structure of four new columns for the five values found. The value that is not given a column for car type is Panel trunk; there was not a reason for this value selection.
+
+Now, all the categorical variables are converted to numeric for the model!
+
+```{r}
+#Mutating the columns with two value into a binary dummy version below
+#It's under the assumption, false==0 and true==1
+train.clean<-train.clean%>%mutate(PARENT1=if_else(PARENT1=="No",0,1))
+train.clean<-train.clean%>%mutate(MSTATUS=if_else(MSTATUS=="z_No",0,1))
+train.clean<-train.clean%>%mutate(SEX=if_else(SEX=="M",0,1))
+train.clean<-train.clean%>%mutate(CAR_USE=if_else(CAR_USE=="PRIVATE",0,1))
+train.clean<-train.clean%>%mutate(RED_CAR=if_else(RED_CAR=="no",0,1))
+train.clean<-train.clean%>%mutate(REVOKED=if_else(REVOKED=="No",0,1))
+train.clean<-train.clean%>%mutate(URBANICITY=if_else(URBANICITY=="z_Highly Rural/ Rural",0,1))
+
+# Following the K-1 format, each variable lowest choice does not receive a column
+#i.e highest education, the no high school diploma does not get a column
+train.clean<-train.clean%>%mutate(.isDiploma=if_else(EDUCATION=="z_High School",1,0),
+                                  .isBach=if_else(EDUCATION=="Bachelors",1,0),
+                                  .isMasters=if_else(EDUCATION=="Masters",1,0),
+                                  .isPhd=if_else(EDUCATION=="PhD",1,0)
+                                  )
+#assuming unemployed lowest level to not deal with a NA 
+train.clean<-train.clean%>%mutate(.isProf=if_else(JOB=="Professional",1,0),
+                                  .isBlue=if_else(JOB=="z_Blue Collar",1,0),
+                                  .isClerk=if_else(JOB=="Clerical",1,0),
+                                  .isDoctor=if_else(JOB=="Doctor",1,0),
+                                  .isLawyer=if_else(JOB=="Lawyer",1,0),
+                                  .isHome=if_else(JOB=="Home Maker",1,0),
+                                  .isStudent=if_else(JOB=="Student",1,0),
+                                  .isManager=if_else(JOB=="Manager",1,0)
+                                  )
+
+#assume panel truck is lowest
+train.clean<-train.clean%>%mutate(.isMini=if_else(CAR_TYPE=="Minivan",1,0),
+                                  .isSUV=if_else(CAR_TYPE=="z_SUV",1,0),
+                                  .isSport=if_else(CAR_TYPE=="Sports Car",1,0),
+                                  .isVan=if_else(CAR_TYPE=="Van",1,0),
+                                  .isPickup=if_else(CAR_TYPE=="Pickup",1,0)
+                                  )
+
+#removing categorical columns after dummies are set
+train.clean<-train.clean%>%select(-c(EDUCATION,CAR_TYPE,JOB))
+```
+
+#### Converting variables towards normal distribution
+
+The next task is transforming the non-normal data seen in the numeric predictor values. The team wants to ensure all data is close to normal before applying to the regression model. First, Let's check the distribution of the new spend metrics below and if they will need to be included in the transformation.
+
+The plots suggest these predictors will need its values transform in order to use in linear regression.
+
+```{r}
+#Checking distribution of the variables below before boxcox
+g1<-ggplot(data=train.clean,aes(x=INCOME))+geom_density()+theme_classic()
+g2<-ggplot(data=train.clean,aes(x=HOME_VAL))+geom_density()+theme_classic()
+g3<-ggplot(data=train.clean,aes(x=BLUEBOOK))+geom_density()+theme_classic()
+g4<-ggplot(data=train.clean,aes(x=OLDCLAIM))+geom_density()+theme_classic()
+ggarrange(g1,g2,g3,g4,nrow = 2,ncol = 2)
+```
+
+The team will use BoxCox transformations below for the following variables: INCOME, HOME_VAL, BLUEBOOK, OLDCLAIM,KIDSDRIV, AGE, HOMEKIDS, YOJ, TRAVTIME, TIF, MVR_PTS, CLM_FREQ, and CAR_AGE.
+
+
+```{r}
+#importing mass in this section to avoid errors with dplyr
+library(MASS)
+
+#removing random car age of -3
+train.clean<-train.clean%>%filter(!CAR_AGE==-3)
+
+# Using BoxCox to select best fit transformation based on the lambda value of each predictor
+#Performing box cox on the predictors and retrieving their lambdas
+#adding a constant 1 as some observations are zero (i.e income)
+lamb.INCOME<-boxcox((train.clean$INCOME+1)~1)
+lamb.HOME_VAL<-boxcox((train.clean$HOME_VAL+1)~1)
+lamb.BLUEBOOK<-boxcox((train.clean$ BLUEBOOK+1)~1)
+lamb.OLDCLAIM<-boxcox((train.clean$OLDCLAIM+1)~1)
+lamb.KIDSDRIV<-boxcox((train.clean$KIDSDRIV+1)~1)
+lamb.AGE<-boxcox((train.clean$AGE+1)~1)
+lamb.HOMEKIDS<-boxcox((train.clean$HOMEKIDS+1)~1)
+lamb.YOJ<-boxcox((train.clean$YOJ+1)~1)
+lamb.TRAVTIME<-boxcox((train.clean$TRAVTIME+1)~1)
+lamb.TIF<-boxcox((train.clean$TIF+1)~1)
+lamb.MVR_PTS<-boxcox((train.clean$MVR_PTS+1)~1)
+lamb.CLM_FREQ<-boxcox((train.clean$CLM_FREQ+1)~1)
+lamb.CAR_AGE<-boxcox((train.clean$CAR_AGE+1)~1)
+
+#retrieving the exact lambda for transformation
+lamb.INCOME<-lamb.INCOME$x[which.max(lamb.INCOME$y)]#
+lamb.HOME_VAL<-lamb.HOME_VAL$x[which.max(lamb.HOME_VAL$y)]#
+lamb.BLUEBOOK<-lamb.BLUEBOOK$x[which.max(lamb.BLUEBOOK$y)]#
+lamb.OLDCLAIM<-lamb.OLDCLAIM$x[which.max(lamb.OLDCLAIM$y)]#
+lamb.KIDSDRIV<-lamb.KIDSDRIV$x[which.max(lamb.KIDSDRIV$y)]#
+lamb.AGE<-lamb.AGE$x[which.max(lamb.AGE$y)]
+lamb.HOMEKIDS<-lamb.HOMEKIDS$x[which.max(lamb.HOMEKIDS$y)]
+lamb.YOJ<-lamb.YOJ$x[which.max(lamb.YOJ$y)]
+lamb.TRAVTIME<-lamb.TRAVTIME$x[which.max(lamb.TRAVTIME$y)]
+lamb.TIF<-lamb.TIF$x[which.max(lamb.TIF$y)]
+lamb.MVR_PTS<-lamb.MVR_PTS$x[which.max(lamb.MVR_PTS$y)]
+lamb.CLM_FREQ<-lamb.CLM_FREQ$x[which.max(lamb.CLM_FREQ$y)]
+lamb.CAR_AGE<-lamb.CAR_AGE$x[which.max(lamb.CAR_AGE$y)]
+
+
+```
+
+### Build Models
+
+#### Logisitic Model Building
+
+##### Model 1
+
+##### Model 2
+
+##### Model 3
+
+#### Linear Model Building 
+
+##### Model 1
+
+##### Model 2
+
+### Select Models
