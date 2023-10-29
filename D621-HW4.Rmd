@@ -141,7 +141,7 @@ Now, all the categorical variables are converted to numeric for the model!
 train.clean<-train.clean%>%mutate(PARENT1=if_else(PARENT1=="No",0,1))
 train.clean<-train.clean%>%mutate(MSTATUS=if_else(MSTATUS=="z_No",0,1))
 train.clean<-train.clean%>%mutate(SEX=if_else(SEX=="M",0,1))
-train.clean<-train.clean%>%mutate(CAR_USE=if_else(CAR_USE=="PRIVATE",0,1))
+train.clean<-train.clean%>%mutate(CAR_USE=if_else(CAR_USE=="Private",0,1))
 train.clean<-train.clean%>%mutate(RED_CAR=if_else(RED_CAR=="no",0,1))
 train.clean<-train.clean%>%mutate(REVOKED=if_else(REVOKED=="No",0,1))
 train.clean<-train.clean%>%mutate(URBANICITY=if_else(URBANICITY=="z_Highly Rural/ Rural",0,1))
@@ -193,6 +193,18 @@ ggarrange(g1,g2,g3,g4,nrow = 2,ncol = 2)
 
 The team will use BoxCox transformations below for the following variables: INCOME, HOME_VAL, BLUEBOOK, OLDCLAIM,KIDSDRIV, AGE, HOMEKIDS, YOJ, TRAVTIME, TIF, MVR_PTS, CLM_FREQ, and CAR_AGE.
 
+For reference, the transformations listed below will be used for the lambda value provided.
+
+* Box Cox Transformations of \( {\lambda}\)
+  + \(\lambda \)= -2| 1/x^2
+  + \(\lambda\)=-1| 1/x
+  + \(\lambda\)=-0.5| 1/sqrt(x)
+  +\(\lambda\)=0| log(x)
+  +\(\lambda\)=0.5| sqrt(x)
+  +\(\lambda\)=1| x
+  +\(\lambda\)=2| x^2
+  
+Some transformations performed needed a constant for its transformation as there are many predictors have zeros as the values provided. In order to perform the necessary transformations, a constant of 1 was applied to the needed transformation.
 
 ```{r}
 #importing mass in this section to avoid errors with dplyr
@@ -219,20 +231,46 @@ lamb.CLM_FREQ<-boxcox((train.clean$CLM_FREQ+1)~1)
 lamb.CAR_AGE<-boxcox((train.clean$CAR_AGE+1)~1)
 
 #retrieving the exact lambda for transformation
-lamb.INCOME<-lamb.INCOME$x[which.max(lamb.INCOME$y)]#
-lamb.HOME_VAL<-lamb.HOME_VAL$x[which.max(lamb.HOME_VAL$y)]#
-lamb.BLUEBOOK<-lamb.BLUEBOOK$x[which.max(lamb.BLUEBOOK$y)]#
-lamb.OLDCLAIM<-lamb.OLDCLAIM$x[which.max(lamb.OLDCLAIM$y)]#
-lamb.KIDSDRIV<-lamb.KIDSDRIV$x[which.max(lamb.KIDSDRIV$y)]#
-lamb.AGE<-lamb.AGE$x[which.max(lamb.AGE$y)]
-lamb.HOMEKIDS<-lamb.HOMEKIDS$x[which.max(lamb.HOMEKIDS$y)]
-lamb.YOJ<-lamb.YOJ$x[which.max(lamb.YOJ$y)]
-lamb.TRAVTIME<-lamb.TRAVTIME$x[which.max(lamb.TRAVTIME$y)]
-lamb.TIF<-lamb.TIF$x[which.max(lamb.TIF$y)]
-lamb.MVR_PTS<-lamb.MVR_PTS$x[which.max(lamb.MVR_PTS$y)]
-lamb.CLM_FREQ<-lamb.CLM_FREQ$x[which.max(lamb.CLM_FREQ$y)]
-lamb.CAR_AGE<-lamb.CAR_AGE$x[which.max(lamb.CAR_AGE$y)]
+lamb.INCOME<-lamb.INCOME$x[which.max(lamb.INCOME$y)]#.042
+lamb.HOME_VAL<-lamb.HOME_VAL$x[which.max(lamb.HOME_VAL$y)]#.22
+lamb.BLUEBOOK<-lamb.BLUEBOOK$x[which.max(lamb.BLUEBOOK$y)]#.46
+lamb.OLDCLAIM<-lamb.OLDCLAIM$x[which.max(lamb.OLDCLAIM$y)]#-.018
+lamb.KIDSDRIV<-lamb.KIDSDRIV$x[which.max(lamb.KIDSDRIV$y)]#-2
+lamb.AGE<-lamb.AGE$x[which.max(lamb.AGE$y)]#1.03
+lamb.HOMEKIDS<-lamb.HOMEKIDS$x[which.max(lamb.HOMEKIDS$y)]#-1.83
+lamb.YOJ<-lamb.YOJ$x[which.max(lamb.YOJ$y)]#1.59
+lamb.TRAVTIME<-lamb.TRAVTIME$x[which.max(lamb.TRAVTIME$y)]#.66
+lamb.TIF<-lamb.TIF$x[which.max(lamb.TIF$y)]#.10
+lamb.MVR_PTS<-lamb.MVR_PTS$x[which.max(lamb.MVR_PTS$y)]#-0.46
+lamb.CLM_FREQ<-lamb.CLM_FREQ$x[which.max(lamb.CLM_FREQ$y)]#-1.47
+lamb.CAR_AGE<-lamb.CAR_AGE$x[which.max(lamb.CAR_AGE$y)]#1.03
 
+#Performing the aligned transformation. For spend, added a constant 1 to prevent transformations towards zero
+train.clean<-train.clean%>%mutate(INCOME=log(INCOME+1))
+train.clean<-train.clean%>%mutate(HOME_VAL=log(HOME_VAL+1))
+train.clean<-train.clean%>%mutate(BLUEBOOK=sqrt(BLUEBOOK))
+train.clean<-train.clean%>%mutate(OLDCLAIM=log(OLDCLAIM+1))
+train.clean<-train.clean%>%mutate(KIDSDRIV=1/(KIDSDRIV+1)**2)
+train.clean<-train.clean%>%mutate(AGE=(AGE**lamb.AGE-1)/lamb.AGE)
+train.clean<-train.clean%>%mutate(HOMEKIDS=log(HOMEKIDS+1))
+train.clean<-train.clean%>%mutate(YOJ=(YOJ**lamb.YOJ-1)/lamb.YOJ)
+train.clean<-train.clean%>%mutate(TRAVTIME=sqrt(TRAVTIME))
+train.clean<-train.clean%>%mutate(YOJ=log(YOJ+1))
+train.clean<-train.clean%>%mutate(TIF=(TIF**lamb.TIF-1)/lamb.TIF)
+train.clean<-train.clean%>%mutate(MVR_PTS=sqrt(MVR_PTS))
+train.clean<-train.clean%>%mutate(CLM_FREQ=log(CLM_FREQ+1))
+train.clean<-train.clean%>%mutate(CAR_AGE=(CAR_AGE**lamb.CAR_AGE-1)/lamb.CAR_AGE)
+
+```
+
+#### Checking for Multi-Collinearity
+
+Before any steps are taken in feature selection, the current features should be check for multi-collinearity.
+
+Looking at the corrplot below, there aren't any strong relationships between the variables below to remove pre feature selection.
+```{r}
+#checking for highly correlated variables
+corrplot(cor(train.clean[,3:39]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 
 ```
 
