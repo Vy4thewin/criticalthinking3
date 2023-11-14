@@ -261,22 +261,23 @@ knitr::kable(model_res, "pipe")
 
 ```
 
-**Log Likelihood**
 
-**Deviance**
-The deviance is a measure of how well the model fits the data.
-```{r}
+**Deviance**  
+The deviance is a measure of how well the model fits the data.The values are large for all three models, we cannot directly conclude a relationship.
+```{r echo=FALSE}
 #the p-value for the test of the hypothesis that at least one of the predictors is related to the response. 
 #Values are large for all models, we cannot directly conclude a relationship.
-1-pchisq(model_res[["df.residual"]][1],fit1$df.residual) #model1
-1-pchisq(model_res[["df.residual"]][2],fit2$df.residual) #model2
-1-pchisq(model_res[["df.residual"]][3],fit3$df.residual) #model3
+sprintf("Model 1 p-val is: %.7f%%",(1-pchisq(model_res[["df.residual"]][1],fit1$df.residual)))  #model1
+sprintf("Model 2 p-val is: %.7f%%",(1-pchisq(model_res[["df.residual"]][2],fit2$df.residual)))  #model2
+sprintf("Model 3 p-val is: %.7f%%",(1-pchisq(model_res[["df.residual"]][3],fit3$df.residual)))  #model3
+
+ #model3
 ```
   
 **Residuals for Logistics Regression**
   
 Similar residual variance is seen for all three models. Since the deviance residuals seem to have mostly even variation across all models we will accept the models as adequate for our purposes. If our goal was to explain which predictors contribute to the response variable, we would like to much more evenly distributed variance of residuals.
-```{r}
+```{r echo=FALSE}
 par(mfrow = c(1, 3))
 
 #model 1
@@ -299,11 +300,11 @@ plot(residuals ~ linpred, diagdf3, xlab="linear predictor", main="Model 3")
 
 ```
 
-**AIC/BIC**
+**AIC/BIC**  
 Model 3 has the lowest values for AIC and BIC. The lower the value, the better fit the model has. The lower score for model 3 is a good sign which explains that goodness of fit is better than in Model 1 and Model 2. Both AIC and BIC rewards goodness of fit, but penalizes a model as the number of predictors increase. Model 3 has the least amount of predictors which checks out with having a lower complexity criterion. Given that the goal for this model is prediction, the preferred metric will be AIC. If the goal for this model had been to explain the response, BIC metric would be the preferred choice.
   
 
-**Goodness of Fit**
+**Goodness of Fit**  
 The Homer-Lemeshow goodness of fit test is used to assess how a binary logistic regression model fits the observed data. Our results show that model 1 and model 2 are not a good fit. This is observed by the low p-value. The null hypothesis states that there is no difference between the observed and expected frequencies across the groups. In other words, the logistic regression model fits the data well.  
 
 When observing the plot correlation between probability and the proportion of said event occurring, model 3 displays that all results align. This further confirms model 3 as a model of choice.
@@ -316,17 +317,19 @@ performance_hosmer(fit2, n_bins = 15)
 
 #model3
 performance_hosmer(fit3, n_bins = 15)
+```
 
+```{r echo=FALSE}
 #plotCalibration(data = training_data, cOutcome = 13, predRisk = fitted(fit3), groups= 15) #target found in column 13
 
 training_data$pred <- predict.glm(fit3, type = 'response')
 calibration_plot(data = training_data, obs = "target", pred = "pred", title = "Calibration plot for training data")
 ```
-**Model 3 Evaluation** 
-
+  
+**Model 3 Evaluation**  
 The binary logistic regression model achieved a score of 97.19% in AUC. The closer to 100% the better predictive power a model has. Additionally, the model scored a 91.20% in accuracy. Given that the training_set was well balanced between both categorical responses, we can disregard F1-score as a measure of performance. Had the model been imbalanced, the F1-score provides a harmonic mean score between precision and sensitivity, therefore providing a more realistic evaluation.
 
-```{r}
+```{r echo=FALSE, warning=FALSE}
 training_data <- mutate(training_data, predout=ifelse(pred < 0.5, 0, 1))
 
 #Create confusion matrix
@@ -343,8 +346,9 @@ sprintf("Model 3 Specificity is: %.2f%%",(cm$byClass['Specificity']*100))
 sprintf("Model 3 F1-score is: %.2f%%",(cm$byClass['F1']*100))
 sprintf("Model 3 AUC is: %.2f%%",(auc_res[1]*100))
 ```
-**ROC Curve**
-```{r message=FALSE}
+  
+**ROC Curve**  
+```{r echo=FALSE, message=FALSE}
 roc_score= roc(training_data$predout, fit3$fitted.values) #AUC score
 
 par(pty="s")
@@ -354,8 +358,7 @@ plot(roc_score ,main ="ROC curve -- Logistic Regression ", legacy.axes=TRUE)
 
 
 **Making Predictions**
-
-```{r}
+```{r echo=FALSE}
 testing_data$pred_prob <- predict(fit3, testing_data, type="response")
 testing_data <- mutate(testing_data, predout=ifelse(pred_prob < 0.5, 0, 1))
 
