@@ -17,6 +17,7 @@ library(tidyverse)
 library(ggpubr)
 library(corrplot)
 library(broom)
+library(pscl)
 library(lmtest)
 library(performance)
 library(PredictABEL)
@@ -250,12 +251,18 @@ glance(fit3)
 
 ### Select Model  
 
-
 **Model Metrics Table**
-```{r message=FALSE, echo=FALSE}
+```{r echo=FALSE, message=FALSE}
+#Calc McFaddens pseudo r^2 for each model
+pseudo_r2.m1 <- pR2(fit1, method = "mcfadden")
+pseudo_r2.m2 <- pR2(fit2, method = "mcfadden")
+pseudo_r2.m3 <- pR2(fit3, method = "mcfadden")
+mcfads_vals <- c(pseudo_r2.m1[4], pseudo_r2.m2[4], pseudo_r2.m3[4])
+
 model_res <- bind_rows(glance(fit1), glance(fit2), glance(fit3))
 model_names <- c("model 1","model 2","model 3")
 model_res <- cbind(model.build = model_names, model_res)
+model_res <- cbind(model_res,McFaddens.R2 = mcfads_vals)
 
 knitr::kable(model_res, "pipe")
 
@@ -263,7 +270,7 @@ knitr::kable(model_res, "pipe")
 
 
 **Deviance**  
-The deviance is a measure of how well the model fits the data.The values are large for all three models, we cannot directly conclude a relationship.
+The deviance is a measure of how well the model fits the data.The values are large for all three models, we cannot directly conclude a relationship.  
 ```{r echo=FALSE}
 #the p-value for the test of the hypothesis that at least one of the predictors is related to the response. 
 #Values are large for all models, we cannot directly conclude a relationship.
@@ -274,7 +281,7 @@ sprintf("Model 3 p-val is: %.7f%%",(1-pchisq(model_res[["df.residual"]][3],fit3$
  #model3
 ```
   
-**Residuals for Logistics Regression**
+**Residuals for Logistics Regression**  
   
 Similar residual variance is seen for all three models. Since the deviance residuals seem to have mostly even variation across all models we will accept the models as adequate for our purposes. If our goal was to explain which predictors contribute to the response variable, we would like to much more evenly distributed variance of residuals.
 ```{r echo=FALSE}
@@ -306,8 +313,8 @@ Model 3 has the lowest values for AIC and BIC. The lower the value, the better f
 
 **Goodness of Fit**  
 The Homer-Lemeshow goodness of fit test is used to assess how a binary logistic regression model fits the observed data. Our results show that model 1 and model 2 are not a good fit. This is observed by the low p-value. The null hypothesis states that there is no difference between the observed and expected frequencies across the groups. In other words, the logistic regression model fits the data well.  
-
-When observing the plot correlation between probability and the proportion of said event occurring, model 3 displays that all results align. This further confirms model 3 as a model of choice.
+  
+When observing the plot correlation between probability and the proportion of said event occurring, model 3 displays that all results align. This further confirms model 3 as a model of choice.  
 ```{r}
 #model1
 performance_hosmer(fit1, n_bins = 15)
@@ -318,7 +325,7 @@ performance_hosmer(fit2, n_bins = 15)
 #model3
 performance_hosmer(fit3, n_bins = 15)
 ```
-
+  
 ```{r echo=FALSE}
 #plotCalibration(data = training_data, cOutcome = 13, predRisk = fitted(fit3), groups= 15) #target found in column 13
 
@@ -326,9 +333,12 @@ training_data$pred <- predict.glm(fit3, type = 'response')
 calibration_plot(data = training_data, obs = "target", pred = "pred", title = "Calibration plot for training data")
 ```
   
+**McFadden's Pseudo-R2**
+All three models scored around 70% with model three having a slightly lower score. Nothing of concern is revealed by this metric. Although the score is lower, We will continue to accept model 3 as the top candidate. Again, evaluation metrics such as AIC are considered better for predictive purposes. 
+  
 **Model 3 Evaluation**  
 The binary logistic regression model achieved a score of 97.19% in AUC. The closer to 100% the better predictive power a model has. Additionally, the model scored a 91.20% in accuracy. Given that the training_set was well balanced between both categorical responses, we can disregard F1-score as a measure of performance. Had the model been imbalanced, the F1-score provides a harmonic mean score between precision and sensitivity, therefore providing a more realistic evaluation.
-
+  
 ```{r echo=FALSE, warning=FALSE}
 training_data <- mutate(training_data, predout=ifelse(pred < 0.5, 0, 1))
 
@@ -355,9 +365,9 @@ par(pty="s")
 plot(roc_score ,main ="ROC curve -- Logistic Regression ", legacy.axes=TRUE)
 
 ```
-
-
+  
 **Making Predictions**
+The model yielded a 20/20 split. If 
 ```{r echo=FALSE}
 testing_data$pred_prob <- predict(fit3, testing_data, type="response")
 testing_data <- mutate(testing_data, predout=ifelse(pred_prob < 0.5, 0, 1))
@@ -367,6 +377,8 @@ knitr::kable(head(testing_data,10) , "pipe")
 knitr::kable(table(testing_data$predout), "pipe")
 
 ```
+
+
 
 
 
