@@ -367,7 +367,8 @@ plot(roc_score ,main ="ROC curve -- Logistic Regression ", legacy.axes=TRUE)
 ```
   
 **Making Predictions**
-The model yielded a 20/20 split. If 
+The model yielded a 20/20 split. If the test data has a distribution reflecting that of the testing data, it is sensible to assume the model has significant predictive capabilities.   
+
 ```{r echo=FALSE}
 testing_data$pred_prob <- predict(fit3, testing_data, type="response")
 testing_data <- mutate(testing_data, predout=ifelse(pred_prob < 0.5, 0, 1))
