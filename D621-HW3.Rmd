@@ -268,7 +268,33 @@ knitr::kable(model_res, "pipe")
 
 ```
 
+
+**Linearity Assumption**  
   
+```{r}
+# Predict the probability (p) of crime
+probabilities <- predict(fit3, type = "response")
+predicted.classes <- ifelse(probabilities < 0.5, 0, 1)
+
+# Select only numeric predictors
+num_predictors <- training_data %>%
+  dplyr::select_if(is.numeric) |>
+  select(-c(chas, target))
+predictors <- colnames(num_predictors)
+
+# Bind the logit and tidying the data for plot
+num_predictors <- num_predictors %>%
+  mutate(logit = log(probabilities/(1-probabilities))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+#Create Scatter plots
+ggplot(num_predictors, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
 **Deviance**  
 The deviance is a measure of how well the model fits the data.The values are large for all three models, we cannot directly conclude a relationship.  
 ```{r echo=FALSE}
@@ -337,11 +363,7 @@ calibration_plot(data = training_data, obs = "target", pred = "pred", title = "C
 All three models scored around 70% with model three having a slightly lower score. Nothing of concern is revealed by this metric. Although the score is lower, We will continue to accept model 3 as the top candidate. Again, evaluation metrics such as AIC are considered better for predictive purposes. 
   
   
-**Logistic Relationship**  
-  
-```{r}
 
-```
   
 **Model 3 Evaluation**  
 The binary logistic regression model achieved a score of 97.19% in AUC. The closer to 100% the better predictive power a model has. Additionally, the model scored a 91.20% in accuracy. Given that the training_set was well balanced between both categorical responses, we can disregard F1-score as a measure of performance. Had the model been imbalanced, the F1-score provides a harmonic mean score between precision and sensitivity, therefore providing a more realistic evaluation.
