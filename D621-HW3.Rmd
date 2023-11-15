@@ -268,7 +268,7 @@ knitr::kable(model_res, "pipe")
 
 ```
 
-
+  
 **Deviance**  
 The deviance is a measure of how well the model fits the data.The values are large for all three models, we cannot directly conclude a relationship.  
 ```{r echo=FALSE}
@@ -336,6 +336,13 @@ calibration_plot(data = training_data, obs = "target", pred = "pred", title = "C
 **McFadden's Pseudo-R2**
 All three models scored around 70% with model three having a slightly lower score. Nothing of concern is revealed by this metric. Although the score is lower, We will continue to accept model 3 as the top candidate. Again, evaluation metrics such as AIC are considered better for predictive purposes. 
   
+  
+**Logistic Relationship**  
+  
+```{r}
+
+```
+  
 **Model 3 Evaluation**  
 The binary logistic regression model achieved a score of 97.19% in AUC. The closer to 100% the better predictive power a model has. Additionally, the model scored a 91.20% in accuracy. Given that the training_set was well balanced between both categorical responses, we can disregard F1-score as a measure of performance. Had the model been imbalanced, the F1-score provides a harmonic mean score between precision and sensitivity, therefore providing a more realistic evaluation.
   
@@ -359,16 +366,21 @@ sprintf("Model 3 AUC is: %.2f%%",(auc_res[1]*100))
   
 **ROC Curve**  
 ```{r echo=FALSE, message=FALSE}
-roc_score= roc(training_data$predout, fit3$fitted.values) #AUC score
-
 par(pty="s")
+roc_score= roc(training_data$predout, fit3$fitted.values) #AUC score
 plot(roc_score ,main ="ROC curve -- Logistic Regression ", legacy.axes=TRUE)
 
+
+# true_labels <- training_data$predout
+# roc_curve <- roc(true_labels, predicted_probabilities)
+# plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+# abline(a = 0, b = 1, col = "gray", lty = 2)
+# legend("bottomright", legend = paste("AUC =", round(auc(roc_curve), 2)), col = "blue", lwd = 2)
 ```
   
 **Making Predictions**
 The model yielded a 20/20 split. If the test data has a distribution reflecting that of the testing data, it is sensible to assume the model has significant predictive capabilities.   
-
+  
 ```{r echo=FALSE}
 testing_data$pred_prob <- predict(fit3, testing_data, type="response")
 testing_data <- mutate(testing_data, predout=ifelse(pred_prob < 0.5, 0, 1))
