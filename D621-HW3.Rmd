@@ -57,7 +57,7 @@ target| whether the crime rate is above the median crime rate (1) or not (0)|res
 Reviewing the training set, the data set has 466 observations and 12 predictor variables. There are no missing values in the training set, therefore there is no need for imputation. However, the mean and median of several variables look strange. Let's review a visualization of the distribution of those values below.
 
 
-```{r warning=FALSE}
+```{r echo=FALSE, warning=FALSE}
 #count of training set
 sprintf("Number of observations: %1.f",count(training_data))
 
@@ -80,7 +80,7 @@ Another questionable variable is "*rad*", which is the index of accessibility to
 
 Possible paths for the heavily skewed may need a transformation, but let's see if there are predictors that are multi-collinear that can be removed pre-transformation!
 
-```{r}
+```{r echo=FALSE}
 #Look at the distribution of all predictor variables
 g1<-training_data%>%ggplot(aes(x=zn))+geom_histogram(bins=25)+theme_classic()
 g2<-training_data%>%ggplot(aes(x=indus))+geom_histogram(bins=25)+theme_classic()
@@ -101,7 +101,7 @@ ggarrange(g1,g2,g4,g5,g6,g7,g8,g9,g10,g11,g12,nrow = 3,ncol = 4)
 
 In review of our predictor variables, rad and tax have a high correlation of 0.91 compared to other variables. The team can remove rad variable from the preliminary regression model as tax variable requires less transformations. There are some moderately correlated variables in the graph below (i.e *nox*&*dis*,*indus*&*nox*), but the team can investigate in model building if variable removal is necessary. 
 
-```{r}
+```{r echo=FALSE}
 #checking for multi-collinearity 
 drop <- c("chas","target")
 corrplot(cor(training_data[,!(names(training_data) %in% drop)]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
@@ -122,7 +122,7 @@ The most useful transformation is handling the highly skewed features for the mo
 
 *zn*, *tax*, *pratio*, *nox*, and *indus* will need transformations before the feature selection. The variable *zn* is very fragment in its distribution, so it might benefit from a polynomial transformation. It is a quicker transformation than creating dummy variables for all quartiles in *zn*.
 
-```{r}
+```{r echo=FALSE}
 #Creating a polynomial term from zn for a more stable predictor variable
 train.set<-training_data%>%mutate_at(c(1),~poly(.,2))
 
@@ -135,7 +135,7 @@ ggarrange(g1,g2)
 
 We can determine the other feature's transformation through box cox!
 
-```{r}
+```{r echo=FALSE}
 #Performing box cox on the predictors and retrieving their lambdas
 lamb.indus<-boxcox(training_data$indus~1)
 lamb.nox<-boxcox(training_data$nox~1)
@@ -252,7 +252,7 @@ glance(fit3)
 ### Select Model  
 
 **Model Metrics Table**
-```{r echo=FALSE, message=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 #Calc McFaddens pseudo r^2 for each model
 pseudo_r2.m1 <- pR2(fit1, method = "mcfadden")
 pseudo_r2.m2 <- pR2(fit2, method = "mcfadden")
@@ -269,30 +269,29 @@ knitr::kable(model_res, "pipe")
 ```
 
 
-**Linearity Assumption**  
-  
-```{r}
-# Predict the probability (p) of crime
-probabilities <- predict(fit3, type = "response")
-predicted.classes <- ifelse(probabilities < 0.5, 0, 1)
 
-# Select only numeric predictors
-num_predictors <- training_data %>%
-  dplyr::select_if(is.numeric) |>
-  select(-c(chas, target))
-predictors <- colnames(num_predictors)
-
-# Bind the logit and tidying the data for plot
-num_predictors <- num_predictors %>%
-  mutate(logit = log(probabilities/(1-probabilities))) %>%
-  gather(key = "predictors", value = "predictor.value", -logit)
-
-#Create Scatter plots
-ggplot(num_predictors, aes(logit, predictor.value))+
-  geom_point(size = 0.5, alpha = 0.5) +
-  geom_smooth(method = "loess") + 
-  theme_bw() + 
-  facet_wrap(~predictors, scales = "free_y")
+```{r eval=FALSE, include=FALSE}
+# # Predict the probability (p) of crime
+# probabilities <- predict(fit3, type = "response")
+# predicted.classes <- ifelse(probabilities < 0.5, 0, 1)
+# 
+# # Select only numeric predictors
+# num_predictors <- training_data %>%
+#   dplyr::select_if(is.numeric) |>
+#   select(-c(chas, target))
+# predictors <- colnames(num_predictors)
+# 
+# # Bind the logit and tidying the data for plot
+# num_predictors <- num_predictors %>%
+#   mutate(logit = log(probabilities/(1-probabilities))) %>%
+#   gather(key = "predictors", value = "predictor.value", -logit)
+# 
+# #Create Scatter plots
+# ggplot(num_predictors, aes(logit, predictor.value))+
+#   geom_point(size = 0.5, alpha = 0.5) +
+#   geom_smooth(method = "loess") + 
+#   theme_bw() + 
+#   facet_wrap(~predictors, scales = "free_y")
 ```
 
 **Deviance**  
@@ -360,13 +359,15 @@ calibration_plot(data = training_data, obs = "target", pred = "pred", title = "C
 ```
   
 **McFadden's Pseudo-R2**
-All three models scored around 70% with model three having a slightly lower score. Nothing of concern is revealed by this metric. Although the score is lower, We will continue to accept model 3 as the top candidate. Again, evaluation metrics such as AIC are considered better for predictive purposes. 
+All three models scored around 70% with model 3 having a slightly lower score. Nothing of concern is revealed by this metric. Although the score is lower, We will continue to accept model 3 as the top candidate. Again, evaluation metrics such as AIC are considered better for predictive purposes. 
   
   
 
   
 **Model 3 Evaluation**  
 The binary logistic regression model achieved a score of 97.19% in AUC. The closer to 100% the better predictive power a model has. Additionally, the model scored a 91.20% in accuracy. Given that the training_set was well balanced between both categorical responses, we can disregard F1-score as a measure of performance. Had the model been imbalanced, the F1-score provides a harmonic mean score between precision and sensitivity, therefore providing a more realistic evaluation.
+
+Generally speaking, the goal is to get the highest AUC possible as this indicates a high true positive rate (sensitivity) and a high true negative rate (specificity). However, McFadden's Pseudo-R-square being <70% and the deviance being high, this could indicate a case of overfitting. Overfitting occurs when the model learns the training data too well. To get a better sense if overfitting is occurring it could be sensible to employ cross-validation to evaluate multiple subsets of the training data.
   
 ```{r echo=FALSE, warning=FALSE}
 training_data <- mutate(training_data, predout=ifelse(pred < 0.5, 0, 1))
@@ -412,6 +413,8 @@ knitr::kable(head(testing_data,10) , "pipe")
 knitr::kable(table(testing_data$predout), "pipe")
 
 ```
+
+
 
 
 
