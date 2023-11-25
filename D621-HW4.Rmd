@@ -24,7 +24,7 @@ testing_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthin
 
 ### Data Exploration
 
-This assignment is a exploration of the insurance data set. The tasks are finding the optimal models for predicting if the insured driver will be involved in a car crash and estimating the value of the insurance payout.
+This assignment is an exploration of the insurance data set. The tasks are finding the optimal models for predicting if the insured driver will be involved in a car crash and estimating the value of the insurance payout.
 
 #### Looking into the insurance data set
 
