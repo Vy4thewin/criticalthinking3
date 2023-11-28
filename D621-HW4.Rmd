@@ -16,6 +16,12 @@ library(tidyverse)
 library(ggpubr)
 library(mice)
 library(corrplot)
+library(MASS)
+library(ISLR)
+library(leaps)
+library(bestglm)
+library(pscl)
+library(car)
 
 training_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/insurance_training_data.csv")
 testing_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/insurance-evaluation-data.csv")
@@ -24,7 +30,7 @@ testing_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthin
 
 ### Data Exploration
 
-This assignment is an exploration of the insurance data set. The tasks are finding the optimal models for predicting if the insured driver will be involved in a car crash and estimating the value of the insurance payout.
+This assignment is a exploration of the insurance data set. The tasks are finding the optimal models for predicting if the insured driver will be involved in a car crash and estimating the value of the insurance payout.
 
 #### Looking into the insurance data set
 
@@ -40,7 +46,8 @@ In addition, there will need to be some transformations of a few non categorical
 summary(training_data)
 
 #Seeing the unique categorical values
-col<-training_data%>%select(PARENT1,MSTATUS,SEX,EDUCATION,JOB,CAR_USE,CAR_TYPE,RED_CAR,REVOKED,URBANICITY )
+col<-training_data%>%
+  dplyr::select(PARENT1,MSTATUS,SEX,EDUCATION,JOB,CAR_USE,CAR_TYPE,RED_CAR,REVOKED,URBANICITY )
 lapply(col, unique)
 ```
 
@@ -102,7 +109,7 @@ The team noticed the cost variables income, home val, blue book, and old claim p
 
 ```{r}
 #Removing index 
-train.clean<-training_data%>%select(-(INDEX))
+train.clean<-training_data%>%dplyr::select(-(INDEX))
 
 #converting the spend columns back to numeric
 train.clean<-train.clean%>%mutate_at(c("INCOME","HOME_VAL","BLUEBOOK","OLDCLAIM"),~parse_number(.))
@@ -173,7 +180,7 @@ train.clean<-train.clean%>%mutate(.isMini=if_else(CAR_TYPE=="Minivan",1,0),
                                   )
 
 #removing categorical columns after dummies are set
-train.clean<-train.clean%>%select(-c(EDUCATION,CAR_TYPE,JOB))
+train.clean<-train.clean%>%dplyr::select(-c(EDUCATION,CAR_TYPE,JOB))
 ```
 
 #### Converting variables towards normal distribution
@@ -278,16 +285,129 @@ corrplot(cor(train.clean[,3:39]),method = "number",type="lower", tl.srt = .71,nu
 
 #### Logisitic Model Building
 
-##### Model 1
+First it must be identified if the person was involved in a car crash. The response variable for the binary model is 'TARGET_FLAG'. Consequently, the linear model response variable 'TARGET_AMT' will be removed to avoid over-fitting in the logistic binary models. A total of three logistic binary models will be built.
 
-##### Model 2
 
-##### Model 3
+```{r include=FALSE}
+#Remove TARGET_AMT
+train.clean.binary <- subset(train.clean, select = -c(TARGET_AMT)) #|>
+  # rename(y = TARGET_FLAG) |>
+  # relocate(y, .after = last_col())
+```
+  
+##### Logistic Model 1  
+This model includes all transformed variables along with dummy values for categorical features. It'll be used as a baseline to compare it to other model building techniques that will be used in model 2 and model 3.
+  
+```{r LogReg-M1, echo=FALSE}
+#Forward selection
+fit1 <- glm(TARGET_FLAG ~ ., data=train.clean.binary, family=binomial)
+
+summary(fit1)
+```
+```{r eval=FALSE, include=FALSE}
+# #Sort pvals in model 1
+# idx <- order(coef(summary(fit1))[,4])  # sort out the p-values
+# out <- coef(summary(fit1))[idx,]       # reorder coef, SE, etc. by increasing p
+# (as.data.frame(out))
+```
+
+
+**Explore removing highly Correlated variables**  
+'.isSUV', '.isBlue', '.isClerk', and "OLDCLAIM" were found to have VIF values above 5. In other words, there is high multicollinearity present. A model was explored to verify if removal of these variables would improve the model. Removal did not improve theAIC score, as such the original model with all variables was selected as model 1.
+
+```{r}
+#Check VIF
+vif_values <- vif(fit1)
+print(vif_values)
+```
+
+```{r}
+#Explore removing highly Correlated variables
+variables_to_exclude <- c(".isSUV", ".isBlue", ".isClerk", "OLDCLAIM")   
+names.include <- names(train.clean.binary)[!(names(train.clean.binary) %in% variables_to_exclude)]
+
+updated_fit1 <- glm(TARGET_FLAG ~ ., train.clean.binary[, names.include], family=binomial)
+
+
+summary(updated_fit1)
+glance(updated_fit1)
+```
+
+
+##### Logistic Model 2  
+  
+This model initially includes all transformed variables along with the dummy values generated for categorical variables. The stepwise method is used, which uses a loop to remove or add variables with the best influence on the AIC score. The recursive loop terminates once all the sequential steps are executed. Ultimately, the subset with the lowest AIC value is chosen as the result.  
+```{r LogReg-M2, echo=FALSE}
+#Stepwise Selection
+fit2 <- glm(TARGET_FLAG ~ ., data = train.clean.binary, family="binomial") %>%
+  stepAIC(direction = "both", trace=FALSE)
+
+summary(fit2)
+```
+
+
+  
+##### Logistic Model 3  
+  
+-For model 3, the top 12 predictor variables found in model 1 and model 2 were handpicked to build a subset model. 
+```{r echo=FALSE}
+#Best subset
+var_subset <- c("TARGET_FLAG", "URBANICITY", "REVOKED", "CAR_USE", "TRAVTIME", "TIF", "MVR_PTS", ".isMini", "BLUEBOOK", "KIDSDRIV", "MSTATUS", ".isManager", "INCOME")
+
+#Forward selection
+fit3 <- glm(train.clean.binary[, var_subset], family=binomial)
+
+summary(fit3)
+glance(fit3)
+```
+
+
+
+**Logistic Model Metrics Table**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Calc McFaddens pseudo r^2 for each binary model
+pseudo_r2.m1 <- pR2(fit1, method = "mcfadden")
+pseudo_r2.m2 <- pR2(fit2, method = "mcfadden")
+pseudo_r2.m3 <- pR2(fit3, method = "mcfadden")
+mcfads_vals <- c(pseudo_r2.m1[4], pseudo_r2.m2[4], pseudo_r2.m3[4])
+
+model_res <- bind_rows(glance(fit1), glance(fit2), glance(fit3))
+model_names <- c("Bin model 1","Bin model 2","Bin model 3")
+model_res <- cbind(model.build = model_names, model_res)
+model_res <- cbind(model_res,McFaddens.R2 = mcfads_vals)
+
+knitr::kable(model_res, "pipe")
+
+```
+
+##### Binary Model Selection
+
+1. Checking residuals
+```{r residuals}
+residuals <- resid(model)
+
+```
+  
+  
+2. Diagnostics Plots
+
+##### Binary Model Prediction
+Predict and filter to people who have crashed their car.
+
+6500/8000
+
+
 
 #### Linear Model Building 
+  
+For people who were in a car car crash, estimate the payout.
 
 ##### Model 1
+- All variables no transformations
 
 ##### Model 2
+- Transformed variables with cross validation.
 
-### Select Models
+##### Linear Model Selection
+
+##### Linear Model Prediction
