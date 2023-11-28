@@ -22,6 +22,12 @@ library(leaps)
 library(bestglm)
 library(pscl)
 library(car)
+library(lmtest)
+library(performance)
+library(PredictABEL)
+library(predtools)
+library(caret)
+library(pROC)
 
 training_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/insurance_training_data.csv")
 testing_data<-read.csv("https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/insurance-evaluation-data.csv")
@@ -41,7 +47,7 @@ For the modeling, we will need these categorical variables to be numeric to run 
 
 In addition, there will need to be some transformations of a few non categorical variables. The values income, home val, blue book, and old claim will need to be re-define as numeric values for the regression.
 
-```{r warning=FALSE}
+```{r echo=FALSE, warning=FALSE}
 #summary of the data set
 summary(training_data)
 
@@ -55,7 +61,7 @@ lapply(col, unique)
 
 Besides the needed transformations above, let's see if there are any missing values with the current data set. It is found that YOJ (Years on the Job), car age, and age have some missing values. The team will have to use imputation for those missing values.
 
-```{r}
+```{r echo=FALSE}
 #checking for Na values
 colSums(is.na(training_data))
 ```
@@ -67,7 +73,7 @@ Looking at the visual representation of their relationships below, there is a lo
 
 It can be interpreted that the claim amount lessens for the variables mentioned above. One call out is there are a few outliers in the variables (i.e claim frequency and mvp) that will need to be checked if they are influential points. Another call out is the fan shape seen in a few scatter plots below. These predictors will need a transformation to correct the heteroscedasticity seen through the fan shape appearance.
 
-```{r warning=FALSE}
+```{r echo=FALSE, warning=FALSE}
 #Checking for linear assumption below
 g1<-ggplot(training_data,aes(x=KIDSDRIV,y=TARGET_AMT))+geom_point()+labs(title = "KIDS DRIVING VS TARGETED AMOUNT",x="# OF DRIVING KIDS",y="TARGETED AMOUNT")+theme_classic()
 g2<-ggplot(training_data,aes(x=AGE,y=TARGET_AMT))+geom_point()+labs(title = "AGE VS TARGETED AMOUNT",x="AGE OF DRIVER",y="TARGETED AMOUNT")+theme_classic()
@@ -83,7 +89,7 @@ ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,ncol =3 ,nrow =3)
 ```
 
 It is apparent in the density distributions plotted below the non-normalness.
-```{r warning=FALSE}
+```{r echo=FALSE, warning=FALSE}
 #gathering a view on the current numeric variables available
 #Definitely will need to revisit spent cols after transformations
 g1<-ggplot(data=training_data,aes(x=KIDSDRIV))+geom_density()+theme_classic()
@@ -107,7 +113,7 @@ There is a list of tasks in order to begin the modeling process. The team will n
 
 The team noticed the cost variables income, home val, blue book, and old claim pulled as categorical. Let's transform them back into numeric values like targeted amount with the transformation below. The team did noticed after the transformation, some values of income and home value were missing. This can lead towards our second task!
 
-```{r}
+```{r include=FALSE}
 #Removing index 
 train.clean<-training_data%>%dplyr::select(-(INDEX))
 
@@ -142,7 +148,7 @@ For job, education and car type the dummy variables will need multiple columns. 
 
 Now, all the categorical variables are converted to numeric for the model!
 
-```{r}
+```{r include=FALSE}
 #Mutating the columns with two value into a binary dummy version below
 #It's under the assumption, false==0 and true==1
 train.clean<-train.clean%>%mutate(PARENT1=if_else(PARENT1=="No",0,1))
@@ -189,7 +195,7 @@ The next task is transforming the non-normal data seen in the numeric predictor 
 
 The plots suggest these predictors will need its values transform in order to use in linear regression.
 
-```{r}
+```{r echo=FALSE}
 #Checking distribution of the variables below before boxcox
 g1<-ggplot(data=train.clean,aes(x=INCOME))+geom_density()+theme_classic()
 g2<-ggplot(data=train.clean,aes(x=HOME_VAL))+geom_density()+theme_classic()
@@ -213,7 +219,7 @@ For reference, the transformations listed below will be used for the lambda valu
   
 Some transformations performed needed a constant for its transformation as there are many predictors have zeros as the values provided. In order to perform the necessary transformations, a constant of 1 was applied to the needed transformation.
 
-```{r}
+```{r echo=FALSE}
 #importing mass in this section to avoid errors with dplyr
 library(MASS)
 
@@ -275,7 +281,7 @@ train.clean<-train.clean%>%mutate(CAR_AGE=(CAR_AGE**lamb.CAR_AGE-1)/lamb.CAR_AGE
 Before any steps are taken in feature selection, the current features should be check for multi-collinearity.
 
 Looking at the corrplot below, there aren't any strong relationships between the variables below to remove pre feature selection.
-```{r}
+```{r echo=FALSE}
 #checking for highly correlated variables
 corrplot(cor(train.clean[,3:39]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 
@@ -288,16 +294,28 @@ corrplot(cor(train.clean[,3:39]),method = "number",type="lower", tl.srt = .71,nu
 First it must be identified if the person was involved in a car crash. The response variable for the binary model is 'TARGET_FLAG'. Consequently, the linear model response variable 'TARGET_AMT' will be removed to avoid over-fitting in the logistic binary models. A total of three logistic binary models will be built.
 
 
-```{r include=FALSE}
+```{r Lin-Var-Removal, include=FALSE}
 #Remove TARGET_AMT
 train.clean.binary <- subset(train.clean, select = -c(TARGET_AMT)) #|>
   # rename(y = TARGET_FLAG) |>
   # relocate(y, .after = last_col())
 ```
   
+  
 ##### Logistic Model 1  
 This model includes all transformed variables along with dummy values for categorical features. It'll be used as a baseline to compare it to other model building techniques that will be used in model 2 and model 3.
+
+**Positive variables** 
+As expected, the 'URBANICITY' variable is the highest positive coefficient for predicting a car crash. Urban cities tend to have higher traffic volume as well as more real estate development with potential to lead to more car crashes. Other variables are in line with a positive expectation such as 'REVOKED', '.isSport', 'CLM_FREQ', 'MVR_PTS'. 
   
+'HOMEKIDS' was a surprise. Theoretically, one would expect parents to be more likely to think about safety under the steering wheel. On the other hand, it can also be interpreted as added stress or perhaps passenger children being a potential distraction from the road. More analysis would have to be done to make a decisive conclusion.
+
+**Negative variables** 
+Red cars having a negative coefficient came as a surprise. It is a well known myth that red cars statistically have higher crashing rates. According to this model, that myth is debunked.
+
+**Significant values** 
+Several variables are **not** statistically significant. In this model 'AGE', 'YOJ', 'SEX', 'REDCAR', 'isStudent', 'OLDCLAIM', 'CAR_AGE', profession, and education level do not add value to the model. Its possible some are affected due to multicollinearity.
+
 ```{r LogReg-M1, echo=FALSE}
 #Forward selection
 fit1 <- glm(TARGET_FLAG ~ ., data=train.clean.binary, family=binomial)
@@ -313,21 +331,20 @@ summary(fit1)
 
 
 **Explore removing highly Correlated variables**  
-'.isSUV', '.isBlue', '.isClerk', and "OLDCLAIM" were found to have VIF values above 5. In other words, there is high multicollinearity present. A model was explored to verify if removal of these variables would improve the model. Removal did not improve theAIC score, as such the original model with all variables was selected as model 1.
+'.isSUV', '.isBlue', '.isClerk', and "OLDCLAIM" were found to have VIF values above 5. In other words, there is high multicollinearity present. A model was explored to verify if removal of these variables would improve the model. Removal did not improve the AIC score, as such the original model with all variables was selected as model 1.
 
-```{r}
+```{r echo=FALSE}
 #Check VIF
 vif_values <- vif(fit1)
 print(vif_values)
 ```
-
-```{r}
+**Updated Model fit 1 with High VIF variables removed**
+```{r echo=FALSE}
 #Explore removing highly Correlated variables
 variables_to_exclude <- c(".isSUV", ".isBlue", ".isClerk", "OLDCLAIM")   
 names.include <- names(train.clean.binary)[!(names(train.clean.binary) %in% variables_to_exclude)]
 
 updated_fit1 <- glm(TARGET_FLAG ~ ., train.clean.binary[, names.include], family=binomial)
-
 
 summary(updated_fit1)
 glance(updated_fit1)
@@ -336,7 +353,7 @@ glance(updated_fit1)
 
 ##### Logistic Model 2  
   
-This model initially includes all transformed variables along with the dummy values generated for categorical variables. The stepwise method is used, which uses a loop to remove or add variables with the best influence on the AIC score. The recursive loop terminates once all the sequential steps are executed. Ultimately, the subset with the lowest AIC value is chosen as the result.  
+This model initially includes all transformed variables along with the dummy values generated for categorical variables. The stepwise method is used, which uses a loop to remove or add variables with the best influence on the AIC score. The recursive loop terminates once all the sequential steps are executed. Ultimately, the subset with the lowest AIC value is chosen as the result. Overall, this model chose a similar subset to model fit 1 with the exception of the non-statistically significant variables.  
 ```{r LogReg-M2, echo=FALSE}
 #Stepwise Selection
 fit2 <- glm(TARGET_FLAG ~ ., data = train.clean.binary, family="binomial") %>%
@@ -349,22 +366,24 @@ summary(fit2)
   
 ##### Logistic Model 3  
   
--For model 3, the top 12 predictor variables found in model 1 and model 2 were handpicked to build a subset model. 
+-For model 3, the top 12 predictor variables found in model 1 and model 2 were handpicked to build a subset model. The model concludes that all the selected variables are statistically significant, however, the AIC value is higher than model 1 and model 2.
 ```{r echo=FALSE}
-#Best subset
 var_subset <- c("TARGET_FLAG", "URBANICITY", "REVOKED", "CAR_USE", "TRAVTIME", "TIF", "MVR_PTS", ".isMini", "BLUEBOOK", "KIDSDRIV", "MSTATUS", ".isManager", "INCOME")
 
-#Forward selection
+#Custom selection
 fit3 <- glm(train.clean.binary[, var_subset], family=binomial)
 
 summary(fit3)
 glance(fit3)
 ```
 
+  
 
+##### Binary Model Selection  
+Given the large amount of observations, the AIC criterion will be used for selection. Model 2 has the best fit among all three models with an AIC score of 7351.850. Model 2 also has a better BIC score (lower score). Lastly, model 2 has a higher McFadden Pseudo R^2 score than model 3 while maintaining a score only slightly below model 1.
 
 **Logistic Model Metrics Table**
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r Criterion-Table, echo=FALSE, message=FALSE, warning=FALSE}
 #Calc McFaddens pseudo r^2 for each binary model
 pseudo_r2.m1 <- pR2(fit1, method = "mcfadden")
 pseudo_r2.m2 <- pR2(fit2, method = "mcfadden")
@@ -377,25 +396,215 @@ model_res <- cbind(model.build = model_names, model_res)
 model_res <- cbind(model_res,McFaddens.R2 = mcfads_vals)
 
 knitr::kable(model_res, "pipe")
+```
+
+**Residuals**  
+```{r Residuals, echo=FALSE}
+par(mfrow = c(1, 3))
+
+#model 1
+resid.df1 <- mutate(train.clean.binary, residuals=residuals(fit1), linpred=predict(fit1))
+gdf1 <- group_by(resid.df1, cut(linpred, breaks=unique(quantile(linpred,(1:272)/273))))
+diagdf1 <- summarise(gdf1, residuals=mean(residuals), linpred=mean(linpred))
+plot(residuals ~ linpred, diagdf1, xlab="linear predictor", main="Model 1")
+
+#model 2
+resid.df2 <- mutate(train.clean.binary, residuals=residuals(fit2), linpred=predict(fit2))
+gdf2 <- group_by(resid.df2, cut(linpred, breaks=unique(quantile(linpred,(1:272)/273))))
+diagdf2 <- summarise(gdf2, residuals=mean(residuals), linpred=mean(linpred))
+plot(residuals ~ linpred, diagdf2, xlab="linear predictor", main="Model 2")
+
+#model 3
+resid.df3 <- mutate(train.clean.binary, residuals=residuals(fit3), linpred=predict(fit3))
+gdf3 <- group_by(resid.df3, cut(linpred, breaks=unique(quantile(linpred,(1:272)/273))))
+diagdf3 <- summarise(gdf3, residuals=mean(residuals), linpred=mean(linpred))
+plot(residuals ~ linpred, diagdf3, xlab="linear predictor", main="Model 3")
+```
+  
+**Deviance (G^2)**  
+The deviance is another measure of how well the model fits the data. Not a single model was able to reject the Null Hypothesis, therefore the deviance goodness-of-fit test confirms that all three models can be considered an adequate fit.
+```{r Deviance-Test, echo=FALSE}
+#the p-value for the test of the hypothesis that at least one of the predictors is related to the response. 
+#Values are large for all models, we cannot directly conclude a relationship.
+sprintf("Model 1 p-val is: %.7f%%",(1-pchisq(model_res[["df.residual"]][1],fit1$df.residual)))  #model1
+sprintf("Model 2 p-val is: %.7f%%",(1-pchisq(model_res[["df.residual"]][2],fit2$df.residual)))  #model2
+sprintf("Model 3 p-val is: %.7f%%",(1-pchisq(model_res[["df.residual"]][3],fit3$df.residual)))  #model3
+```
+  
+**Homer-Lemeshow Goodness of Fit Test**  
+The Homer-Lemeshow goodness of fit test is used to assess how a binary logistic regression model fits the observed data. Our results show that model 1 and model 2 are a good fit. This is observed by the high p-value. The null hypothesis states that there is no difference between the observed and expected frequencies across the groups. In other words, the logistic regression model fits the data well.
+```{r Homer-Lemeshow-GOF}
+library(performance)
+#model1
+performance_hosmer(fit1, n_bins = 272)
+
+#model2
+performance_hosmer(fit2, n_bins = 272)
+
+#model3
+performance_hosmer(fit3, n_bins = 272)
 
 ```
 
-##### Binary Model Selection
 
-1. Checking residuals
-```{r residuals}
-residuals <- resid(model)
+##### Binary Model Prediction  
+  
+This section covers using the selected model (fit2) to predict if a person was involved in an accident or not. Additional diagnostics were observed such as linear assumptions of residuals which show homoscedasticity in the numerical-type variables. A calibration plot also displays a successful agreement between predictions and observations. The model scored a 79.08% in terms of Classification Accuracy. However, specificity (True Negative Rate) are only at 42.57%, whereas Sensitivity is at 92.16% (True Positive Rate). This means the model performs well at predicting people who have been in a car crash. On the other hand, it lacks in the ability to predict people who were **not** involved in a car crash. An alternate score to consider is F1-score which takes a weighted calculation of the binary options. The F1-score is 86.64%. It should be noted the dataset is imbalanced, which may have caused the accuracy disruption of specificity.  
+  
+-Crosstab of traning dataset:
+  
+```{r CrossTab, echo=FALSE}
+knitr::kable(table(train.clean.binary$TARGET_FLAG), "pipe")
+```
+
+
+```{r Linearity-Assumptions, echo=FALSE}
+# Predict the probability (p) of crime
+probabilities <- predict(fit2, type = "response")
+predicted.classes <- ifelse(probabilities < 0.5, 0, 1)
+
+# Select only numeric predictors
+num_predictors <- train.clean.binary[,2:20]
+
+predictors <- colnames(num_predictors)
+
+# Bind the logit and tidying the data for plot
+num_predictors <- num_predictors %>%
+  mutate(logit = log(probabilities/(1-probabilities))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+#Create Scatter plots
+ggplot(num_predictors, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") +
+  theme_bw() +
+  facet_wrap(~predictors, scales = "free_y")
+```
+  
+```{r Model-2-Calibration-Plot, echo=FALSE}
+library(predtools)
+
+train.clean.binary$pred <- predict.glm(fit2, type = 'response')
+calibration_plot(data = train.clean.binary, obs = "TARGET_FLAG", pred = "pred", title = "Calibration plot for training data")
+```
+  
+```{r AUC, echo=FALSE, warning=FALSE}
+train.clean.binary <- mutate(train.clean.binary, predout=ifelse(pred < 0.5, 0, 1))
+
+#Create confusion matrix
+cm <- confusionMatrix(as.factor(train.clean.binary$predout), as.factor(train.clean.binary$TARGET_FLAG))
+
+#Calculate AUC
+auc_res <- auc(train.clean.binary$TARGET_FLAG, train.clean.binary$pred)
+
+sprintf("Model 2 Classification Accuracy is: %.2f%%",(cm$overall[1])*100)
+sprintf("Model 2 Classification Error Rate is: %.2f%%",(1-cm$overall[1])*100)
+sprintf("Model 2 Precision is: %.2f%%",(cm$byClass['Pos Pred Value']*100))
+sprintf("Model 2 Sensitivity/Recall is: %.2f%%",(cm$byClass['Sensitivity']*100))
+sprintf("Model 2 Specificity is: %.2f%%",(cm$byClass['Specificity']*100))
+sprintf("Model 2 F1-score is: %.2f%%",(cm$byClass['F1']*100))
+sprintf("Model 2 AUC is: %.2f%%",(auc_res[1]*100))
+```
+**ROC Curve**  
+```{r ROC, echo=FALSE, message=FALSE}
+# par(pty="s")
+# roc_score= roc(train.clean.binary$TARGET_FLAG, fit2$fitted.values) #AUC score
+# plot(roc_score ,main ="ROC curve -- Logistic Regression ", legacy.axes=TRUE)
+
+true_labels <- train.clean.binary$TARGET_FLAG
+roc_curve <- roc(true_labels, fit2$fitted.values)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+abline(a = 0, b = 1, col = "gray", lty = 2)
+legend("bottomright", legend = paste("AUC =", round(auc(roc_curve), 2)), col = "blue", lwd = 2)
+```
+
+**Making Predictions**  
+The testing data set had a total of 2141 observations. Of those, 371 were classified as a car crash.  
+  
+```{r Testing Data Prep, include=FALSE}
+#Removing index and TARGET_AMT 
+testing_data_binary <-testing_data %>%
+  dplyr::select(-c(INDEX, TARGET_AMT, TARGET_FLAG))
+
+#converting the spend columns back to numeric
+testing.clean.binary <- testing_data_binary %>%
+  mutate_at(c("INCOME","HOME_VAL","BLUEBOOK","OLDCLAIM"),~parse_number(.))
+
+#Using MICE to impute missing values, using pmm to avoid neg impute values
+testing.clean.binary <- complete(mice(testing.clean.binary,method = "pmm",seed = 333))
+
+
+#Mutating the columns with two value into a binary dummy version below
+#It's under the assumption, false==0 and true==1
+testing.clean.binary<-testing.clean.binary%>%mutate(PARENT1=if_else(PARENT1=="No",0,1))
+testing.clean.binary<-testing.clean.binary%>%mutate(MSTATUS=if_else(MSTATUS=="z_No",0,1))
+testing.clean.binary<-testing.clean.binary%>%mutate(SEX=if_else(SEX=="M",0,1))
+testing.clean.binary<-testing.clean.binary%>%mutate(CAR_USE=if_else(CAR_USE=="Private",0,1))
+testing.clean.binary<-testing.clean.binary%>%mutate(RED_CAR=if_else(RED_CAR=="no",0,1))
+testing.clean.binary<-testing.clean.binary%>%mutate(REVOKED=if_else(REVOKED=="No",0,1))
+testing.clean.binary<-testing.clean.binary%>%mutate(URBANICITY=if_else(URBANICITY=="z_Highly Rural/ Rural",0,1))
+
+# Following the K-1 format, each variable lowest choice does not receive a column
+#i.e highest education, the no high school diploma does not get a column
+testing.clean.binary<-testing.clean.binary%>%mutate(.isDiploma=if_else(EDUCATION=="z_High School",1,0),
+                                  .isBach=if_else(EDUCATION=="Bachelors",1,0),
+                                  .isMasters=if_else(EDUCATION=="Masters",1,0),
+                                  .isPhd=if_else(EDUCATION=="PhD",1,0)
+                                  )
+#assuming unemployed lowest level to not deal with a NA 
+testing.clean.binary<-testing.clean.binary%>%mutate(.isProf=if_else(JOB=="Professional",1,0),
+                                  .isBlue=if_else(JOB=="z_Blue Collar",1,0),
+                                  .isClerk=if_else(JOB=="Clerical",1,0),
+                                  .isDoctor=if_else(JOB=="Doctor",1,0),
+                                  .isLawyer=if_else(JOB=="Lawyer",1,0),
+                                  .isHome=if_else(JOB=="Home Maker",1,0),
+                                  .isStudent=if_else(JOB=="Student",1,0),
+                                  .isManager=if_else(JOB=="Manager",1,0)
+                                  )
+
+#assume panel truck is lowest
+testing.clean.binary<-testing.clean.binary%>%mutate(.isMini=if_else(CAR_TYPE=="Minivan",1,0),
+                                  .isSUV=if_else(CAR_TYPE=="z_SUV",1,0),
+                                  .isSport=if_else(CAR_TYPE=="Sports Car",1,0),
+                                  .isVan=if_else(CAR_TYPE=="Van",1,0),
+                                  .isPickup=if_else(CAR_TYPE=="Pickup",1,0)
+                                  )
+
+#removing categorical columns after dummies are set
+testing.clean.binary<-testing.clean.binary%>%dplyr::select(-c(EDUCATION,CAR_TYPE,JOB))
+
+#Applying boxcox transformations
+testing.clean.binary<-testing.clean.binary%>%mutate(INCOME=log(INCOME+1))
+testing.clean.binary<-testing.clean.binary%>%mutate(HOME_VAL=log(HOME_VAL+1))
+testing.clean.binary<-testing.clean.binary%>%mutate(BLUEBOOK=sqrt(BLUEBOOK))
+testing.clean.binary<-testing.clean.binary%>%mutate(OLDCLAIM=log(OLDCLAIM+1))
+testing.clean.binary<-testing.clean.binary%>%mutate(KIDSDRIV=1/(KIDSDRIV+1)**2)
+testing.clean.binary<-testing.clean.binary%>%mutate(AGE=(AGE**lamb.AGE-1)/lamb.AGE)
+testing.clean.binary<-testing.clean.binary%>%mutate(HOMEKIDS=log(HOMEKIDS+1))
+testing.clean.binary<-testing.clean.binary%>%mutate(YOJ=(YOJ**lamb.YOJ-1)/lamb.YOJ)
+testing.clean.binary<-testing.clean.binary%>%mutate(TRAVTIME=sqrt(TRAVTIME))
+testing.clean.binary<-testing.clean.binary%>%mutate(YOJ=log(YOJ+1))
+testing.clean.binary<-testing.clean.binary%>%mutate(TIF=(TIF**lamb.TIF-1)/lamb.TIF)
+testing.clean.binary<-testing.clean.binary%>%mutate(MVR_PTS=sqrt(MVR_PTS))
+testing.clean.binary<-testing.clean.binary%>%mutate(CLM_FREQ=log(CLM_FREQ+1))
+testing.clean.binary<-testing.clean.binary%>%mutate(CAR_AGE=(CAR_AGE**lamb.CAR_AGE-1)/lamb.CAR_AGE)
+
+
+
 
 ```
   
-  
-2. Diagnostics Plots
+```{r Log-Pred-Results, echo=FALSE}
+testing.clean.binary$pred_prob <- predict(fit2, testing.clean.binary, type="response")
+testing.clean.binary <- mutate(testing.clean.binary, predout=ifelse(pred_prob < 0.5, 0, 1))
 
-##### Binary Model Prediction
-Predict and filter to people who have crashed their car.
+knitr::kable(head(testing.clean.binary,10) , "pipe")
 
-6500/8000
+knitr::kable(table(testing.clean.binary$predout), "pipe")
 
+
+
+```
 
 
 #### Linear Model Building 
@@ -411,3 +620,9 @@ For people who were in a car car crash, estimate the payout.
 ##### Linear Model Selection
 
 ##### Linear Model Prediction
+
+
+## Appendix
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
