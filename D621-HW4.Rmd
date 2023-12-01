@@ -104,6 +104,18 @@ g9<-ggplot(data=training_data,aes(x=CAR_AGE))+geom_density()+theme_classic()
 ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,ncol =3 ,nrow =3)
 ```
 
+#### Looking if the data set is balanced
+
+Before the data preparation, the team wants to look at the distribution of cases between car crashes and non crash cases. The team noticed that the distribution of cases are heavily dominated by non car crashes. This imbalance can affect how the model predicts cases where there is a car crash case. It might be the best action to downsample the training set to help with the distribution.
+
+
+```{r}
+#checking the distribution of the response
+training_data%>%ggplot(aes(fill=TARGET_FLAG))+geom_bar(aes(x=TARGET_FLAG))+labs(title="Car crashes in the dataset",x="Car Crash involved")
+
+```
+
+
 ### Data Preparation
 
 There is a list of tasks in order to begin the modeling process. The team will need to address the missing data, the categorical variables, checking column value types, and the transformations towards near normal.
@@ -280,12 +292,23 @@ train.clean<-train.clean%>%mutate(CAR_AGE=(CAR_AGE**lamb.CAR_AGE-1)/lamb.CAR_AGE
 
 Before any steps are taken in feature selection, the current features should be check for multi-collinearity.
 
-Looking at the corrplot below, there aren't any strong relationships between the variables below to remove pre feature selection.
+Looking at the correlation plot below, there aren't any strong relationships between the variables below to remove pre feature selection.
 ```{r echo=FALSE}
 #checking for highly correlated variables
 corrplot(cor(train.clean[,3:39]),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 
 ```
+
+#### Downsampling the data set
+
+In order for the regression model to see a balance in responses between car/non-car crash cases, let's down sampling the training set. As the data set was downsize, the total cases did fall to 4,304 cases. 
+
+```{r}
+#downsampling the cases for a even distribution of the response variable
+dwn_data<-downSample(x=train.clean[,-ncol(train.clean)],y=factor(train.clean$TARGET_FLAG))
+dwn_data<-dwn_data%>%dplyr::select(-c(Class))
+```
+
 
 ### Build Models
 
@@ -376,7 +399,6 @@ fit3 <- glm(train.clean.binary[, var_subset], family=binomial)
 summary(fit3)
 glance(fit3)
 ```
-
   
 
 ##### Binary Model Selection  
