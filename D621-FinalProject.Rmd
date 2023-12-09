@@ -1,0 +1,172 @@
+---
+title: "final_project"
+author: "Jose Rodriguez, Vyanna Hill, Christian Uriostegui"
+date: "2023-12-09"
+output: html_document
+---
+
+```{r Load-Libraries, include=FALSE}
+library(tidyverse) #data wrangling
+library(lubridate) #data wrangling - date formatting
+library(MASS) #box-cox function
+library(car)
+library(forecast)
+```
+
+# Data Preparation
+
+```{r Load-Dataset}
+data_url <- "https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/raw_appstore_data.csv"
+raw.app.data <-read.csv(data_url)
+```
+
+```{r}
+#print(sapply(raw.app.data, class))
+```
+
+##### Data Subset:  
+The data was pre-processed using the tidyverse package. First, a column subset was taken which yielded a total of 18 variables: 17 of those being predictors (x) and one target variable (y). The target variable, also known as the response variable, is 'Rating'. 'This column 'Rating' contains the accumulated average score of a given app between 0 and 5 stars.
+
+##### Missing data:  
+Missing data was handled by removing NA values. Two reasons prompted the omission of missing values: 1) removing missing values only removed about 5% of observations, 2) It is not known if the missing data points are missing completely at random (MCAR), hence imputation could introduce bias to the model.
+
+```{r}
+#Removed columns that are not fit for a linear regression model. (i.e: observation identifying columns). 'Currency' as there was little variation in value
+
+# BRL   CAD   EUR   GBP   INR   KRW   USD   VND   XXX 
+#     1     1     1     1     2     1 28963     1   582
+
+#Create list of columns with blank values
+blank_val_cols <- c("Released", "Last.Updated", "Minimum.Android")
+
+#Create list of date cols
+date_val_cols <- c("Released", "Last.Updated")
+
+#Create list of columns to convert to factor type
+factor_list <- c("Category", "Content.Rating")
+
+app.data <- raw.app.data |>
+  dplyr::select(-c(App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
+  mutate_at(blank_val_cols, ~na_if(., "")) |> #convert blank values to NA to be better handled by na.omit()
+  na.omit()|> #drops 1577 observations (approx. 35 of the original dataset)
+  mutate_at(factor_list, factor) |> #convert cols to factor type
+  mutate(Size = str_replace_all(Size, "[^0-9]","")) |> #remove non digits from 'Size' col
+  mutate(Size = as.numeric(Size)) |>
+  filter(!is.na(Size)) |>
+  mutate(Installs = str_replace_all(Installs, "[^0-9]","")) |> #clean 'Installs' col
+  mutate(Installs = as.numeric(Installs)) |>
+  mutate(across(all_of(date_val_cols), ~mdy(.), .names = "{.col}")) #use lubridate to convert character cols to date format
+```
+
+##### Distribution of Numeric Variables:  
+All numerical variables were found to be highly skewed. Transformations such as box-cox, logarithmic and square-root were explored. However, they did not normalize the data. Consequently, several assumptions are violated: 1) Normality, 2) linearity. Ultimately, this leads to assuming that the data exhibits complex relationships where a Nonparametric Regression could be the best choice. 
+
+```{r Checking Variable Distribution}
+library(ggpubr)
+
+plot.func <- function(data, col){
+  #compute mean for Rating
+  mean_rating <- data |>
+  pull(col) |>
+  mean() |>
+  signif(6)
+  
+  var.dist.plt <- ggplot(
+    data=app.data, aes(x=data[[col]])) +
+    geom_density()+
+    labs(y = "Density", x = data[[col]]) +
+    geom_vline(xintercept=mean_rating, linewidth=1.2, color= "red")
+  
+  return (var.dist.plt)
+}
+
+g1 <- plot.func(app.data, "Rating")
+g2 <-plot.func(app.data, "Rating.Count")
+g3 <- plot.func(app.data, "Installs")
+g4 <- plot.func(app.data, "Minimum.Installs")
+g5 <- plot.func(app.data, "Maximum.Installs")
+g6 <- plot.func(app.data, "Price")
+g7 <- plot.func(app.data, "Size")
+
+plt <- ggarrange(g1,g2,g3,g4,g5,g6,g7,ncol =3, nrow = 3)
+plt
+```
+
+```{r Variable Transformations}
+#Using box-cox transformations (MASS Package)
+lamb.Rating <- boxcox((app.data$Rating+1)~1)
+lamb.Rating.Count <- boxcox((app.data$Rating.Count+1)~1)
+
+
+#retrieving the exact lambda for transformation
+lamb.Rating <- lamb.Rating$x[which.max(lamb.Rating$y)]#0.14
+lamb.Rating.Count <- lamb.Rating.Count$x[which.max(lamb.Rating.Count$y)]#-0.22
+
+
+#app.data <- app.data %>% mutate(Rating = (Rating^lamb.Rating-1/lamb.Rating))
+app.data <- app.data%>%mutate(Rating=log(Rating+1))
+app.data <- app.data%>%mutate(Rating.Count=sqrt(Rating.Count+1))
+
+```
+
+```{r Response Variable}
+# lambda.Rating <- BoxCox.lambda(app.data$Rating)
+# app.data$Rating = BoxCox(app.data$Rating, lambda.Rating)
+# 
+# 
+# #compute mean for Rating
+# mean_rating <- app.data |>
+#   pull(Rating) |>
+#   mean() |>
+#   signif(6)
+# 
+# 
+# var.dist.plt <- ggplot(
+#   data=app.data, aes(x=Rating)) +
+#   geom_density()+
+#   labs(y = "Density", x = "Rating")# +
+#   #geom_vline(xintercept=mean_rating, linewidth=1.2, color= "red")
+# 
+# plot(var.dist.plt)
+```
+
+#####Categorial Variables:  
+Categorical variables can easily be handled by most R modeling functions. As a caveat some of modeling functions require categorical predictors to be of class factor. During the dplyr data wrangling segment, all categorical variables were converted to factor type using a list.
+
+  
+##### Checking for Multi-Collinearity:  
+'Maximum.Installs' and 'Minimum.Installs' were found to be highly correlated to 'Installs'.
+
+```{r echo=FALSE}
+library(corrplot)
+#checking for highly correlated variables
+numeric.data <- app.data %>%
+  select_if(is.numeric)
+
+
+corrplot(cor(numeric.data),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
+
+```
+
+```{r Testing NonParametric Model}
+library(mgcv)
+
+gam.mod <- gam(Rating ~  Category + 
+                 s(Rating.Count) #+
+                 #Installs +
+                 #Minimum.Installs +
+                 #Maximum.Installs +
+                 #Free + 
+                 #Price + 
+                 #Size +
+                 #Minimum.Android +
+                 #Released +
+                 #Last.Updated +
+                 #Content.Rating +
+                 #Ad.Supported + 
+                 #In.App.Purchases +
+                 #Editors.Choice
+               , data = app.data)
+
+summary(gam.mod)
+```
