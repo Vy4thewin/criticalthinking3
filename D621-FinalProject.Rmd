@@ -10,10 +10,11 @@ library(tidyverse) #data wrangling
 library(lubridate) #data wrangling - date formatting
 library(MASS) #box-cox function
 library(car)
+library(fastDummies)
 library(forecast)
 ```
 
-# Data Preparation
+### Data Preparation
 
 ```{r Load-Dataset}
 data_url <- "https://raw.githubusercontent.com/Vy4thewin/criticalthinking3/main/raw_appstore_data.csv"
@@ -28,6 +29,7 @@ raw.app.data <-read.csv(data_url)
 The data was pre-processed using the tidyverse package. First, a column subset was taken which yielded a total of 18 variables: 17 of those being predictors (x) and one target variable (y). The target variable, also known as the response variable, is 'Rating'. 'This column 'Rating' contains the accumulated average score of a given app between 0 and 5 stars.
 
 ##### Missing data:  
+
 Missing data was handled by removing NA values. Two reasons prompted the omission of missing values: 1) removing missing values only removed about 5% of observations, 2) It is not known if the missing data points are missing completely at random (MCAR), hence imputation could introduce bias to the model.
 
 ```{r}
@@ -46,7 +48,7 @@ date_val_cols <- c("Released", "Last.Updated")
 factor_list <- c("Category", "Content.Rating")
 
 app.data <- raw.app.data |>
-  dplyr::select(-c(App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
+  dplyr::select(-c(ï..App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
   mutate_at(blank_val_cols, ~na_if(., "")) |> #convert blank values to NA to be better handled by na.omit()
   na.omit()|> #drops 1577 observations (approx. 35 of the original dataset)
   mutate_at(factor_list, factor) |> #convert cols to factor type
@@ -130,10 +132,10 @@ app.data <- app.data%>%mutate(Rating.Count=sqrt(Rating.Count+1))
 # plot(var.dist.plt)
 ```
 
-#####Categorial Variables:  
+##### Categorial Variables:  
 Categorical variables can easily be handled by most R modeling functions. As a caveat some of modeling functions require categorical predictors to be of class factor. During the dplyr data wrangling segment, all categorical variables were converted to factor type using a list.
 
-  
+
 ##### Checking for Multi-Collinearity:  
 'Maximum.Installs' and 'Minimum.Installs' were found to be highly correlated to 'Installs'.
 
@@ -147,6 +149,12 @@ numeric.data <- app.data %>%
 corrplot(cor(numeric.data),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 
 ```
+
+### Testing GAM Modeling
+
+The team decided to shift the focus from linear models towards Generalized Additive Models (GAM), as the previous linear model attempts produced poor results. In the first model below, the R^2 value increase to 30% with 30% of the deviance accounted. This improvement in the results shows GAM may be a better regression model for fitting the data provided.
+
+The team did notice the R^2 increase with a smoothing function on Rating count. Rating count distribution is highly skewed,as many cases are below <10. The smoothing function provided additional support in shifting the best fit around the feature to a better angle.
 
 ```{r Testing NonParametric Model}
 library(mgcv)
@@ -169,4 +177,76 @@ gam.mod <- gam(Rating ~  Category +
                , data = app.data)
 
 summary(gam.mod)
+par(mfrow = c(2, 2)) 
+plot(gam.mod)
+
+#checking gam stats
+gam.check(gam.mod)
 ```
+
+
+### Introducing shrinking and other smoothing techinques
+
+From the data exploration, the team is aware of the non-linearity of the features in the data set. The current features may not have a linear fit, but its best fit shape can be a polynomial. Using splines, its adjusting the the line with penalties towards mse; which makes the shape more linear. In order to capture the majority of the points in the data set, the best fit line may take the shape of different curves to better fit the response Rating. The team use shrinking smoothed in the features provided as it lessens the penalty.
+
+For the models below, the team use splines with a mix of basis. In addition, the method REML (Restricted Maximum Likelihood) was applied as the model has random effects in the features .For Model two, the cubic spline is applied for the features Installs and Rating.counts. These additional splines boosted the R^2 of the model to 72% with its deviance at 72%. In the plots below, the splines of rating count have a closer fit onto the feature than the previous iteration. Checking the gam, the model did coverage with the terms provided. However, the p-values of the smoothed items are significant. This means the smoothing knots need to be increased as the number of bases are seeing a pattern in the model's residuals.
+
+In the third iteration, the team added more bases to the smoothing function. For the feature Installs, the increases bases improved the p-value out of significance. Rating.count p-value still broke the null hypothesis, which points the feature will need more base functions to correct the null. 
+
+```{r}
+#reviewing previous model, apply cubic splines and updating method to reml
+gam1<- gam(Rating ~s(Rating.Count,bs ='cs') +
+                 s(Installs,bs ='cs')+Category+Ad.Supported+In.App.Purchases
+               , data = app.data,method = "REML")
+
+summary(gam1)
+par(mfrow = c(2, 2)) 
+plot(gam1)
+
+par(mfrow = c(2, 2)) 
+gam.check(gam1)
+
+
+#Increasing the basis functions in the smoothing items
+gam2<- gam(Rating ~s(Rating.Count,bs="cs",k=100) +
+                 s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases, data = app.data,method = "REML")
+summary(gam2)
+gam.check(gam2)
+```
+
+
+The fourth version of the gam model adds the penalty to the model. There was not a big change the results from the previous.
+
+In the next model, the rating count smoothing was removed and editors choice, content rating, and last updated to the model. Although the R^2 dropped to 52%, the fitted vs actual plot appears more normal. Checking the AIC and a few other metrics, it does appear the fourth model has the advantage than the model with the higher log likelihood and lower deviance.
+
+```{r} 
+#Increasing the basis functions in rating count and add extra penalty
+gam3<- gam(Rating ~s(Rating.Count,bs="cs",k=100) +
+                 s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases+Price, data = app.data,method = "REML",select=TRUE)
+
+summary(gam3)
+gam.check(gam3)
+
+#remove smoothing on rating count and add in editors choice
+gam4<- gam(Rating ~Rating.Count+s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases+Editors.Choice+Content.Rating+Last.Updated, data = app.data,method = "REML")
+summary(gam4)
+gam.check(gam4)
+
+#check AIC 
+AIC(gam3,gam4)
+
+library(broom)
+
+glance(gam3)
+glance(gam4)
+```
+
+
+
+```{r}
+app.data%>%ggplot(aes(x=Rating,y=Rating.Count))+geom_histogram()
+app.data%>%ggplot(aes(x=Rating,y=Price))+geom_histogram()
+
+
+```
+
