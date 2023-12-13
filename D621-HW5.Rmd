@@ -122,8 +122,7 @@ The team imputed the missing values with MICE. The mice package will predict the
 ```{r echo=FALSE}
 #Impute via mice with lasso norm
 train.clean<-complete(mice(training_set,method = "pmm",seed = 333)) 
-train.clean<-train.clean%>%dplyr::select(-c("ï..INDEX"))
-
+train.clean<-train.clean%>%dplyr::select(-c("INDEX"))
 ```
 
 
@@ -175,6 +174,9 @@ From earlier, the team appear correct in its assumptions on Label Appeal, STARS,
 
 Calling back to the influx of zero counts, let's check on the model's dispersion. The dispersion is 0.89, which was expected with the high zero count. However, the dispersion is not greater than one and p-value is greater than 0.05 so the model is technically dispersed. The team can see if model two's dispersion score lessens with a optimal subset of features, but it is not guaranteed.
 
+**Diagnostics Plot:**  
+Using the DHARMa library to plot residuals it further confirmed that there is a dispersion issue. The dispersion problem is evident in the deviation from uniformity in the qq-plot. The plot of Residuals Vs predicted show accumulation in the .25 quantile further confirming zero-inflation.
+
 ```{r echo=FALSE}
 pfit1<-glm(TARGET~.,data=train.clean,family="poisson")
 summary(pfit1)
@@ -183,11 +185,34 @@ summary(pfit1)
 dispersiontest(pfit1)
 ```
 
+
+
+```{r PM1-Residuals}
+#Check for dispersion. VAlue of phi
+(phi <- sum(residuals(pfit1, type = "pearson")^2) / pfit1$df.residual) #Model is underdispersed. Try zero-inflated model or Hurdle.
+
+#Goodness of fit test
+1-pchisq(deviance(pfit1),df.residual(pfit1)) #p-value is small indicating evidence of a lack of fit
+
+#check residual plots
+library(DHARMa)
+res.sim <- simulateResiduals(pfit1, n=250)
+plotSimulatedResiduals(res.sim)
+
+#Check zero inflation test
+DHARMa::testZeroInflation(res.sim) #p-value confirms zero-inflation if present in the model
+
+```
+
+
 #### Poisson Model 2
 
 For this model, the team used the subset of the features that found to be statistically significant from the base model. There were a slight improvement to the AIC score from the previous iteration. There weren't any significant changes to the null deviance or the degrees of freedom. The coefficients  saw slight changes in its p values with the feature subset.
 
 Poisson model two saw a slight reduction in its dispersion score, but poisson regression may not be the best fit for the model
+
+**Diagnostics Plot:**    
+As expected, the diagnostic plots and zero-inflation conclusion is almost identical to the Poisson Model 1.
 ```{r echo=FALSE}
 #subset of statistically significant features 
 pfit2<-glm(TARGET~ STARS+ LabelAppeal  + pH +TotalSulfurDioxide +  FreeSulfurDioxide+ Sulphates + Chlorides + AcidIndex + VolatileAcidity,data=train.clean,family = "poisson")
@@ -195,7 +220,25 @@ summary(pfit2)
 
 #dispersion check
 dispersiontest(pfit2)
+
 ```
+
+```{r PM2-Residuals}
+#Check for dispersion. VAlue of phi
+(phi <- sum(residuals(pfit2, type = "pearson")^2) / pfit2$df.residual) #Model is underdispersed. Try zero-inflated model or Hurdle.
+
+#Goodness of fit test
+1-pchisq(deviance(pfit2),df.residual(pfit2)) #p-value is small indicating evidence of a lack of fit
+
+#check residual plots
+res.sim2 <- simulateResiduals(pfit2, n=250)
+plotSimulatedResiduals(res.sim2)
+
+#Check zero inflation test
+DHARMa::testZeroInflation(res.sim2) #low p-value confirms zero-inflation if present in the model
+
+```
+
 
 
 #### Negative Binomial Model 1
@@ -207,18 +250,32 @@ From this run, there wasn't much of a change in the null deviance compared to po
 
 
 Checking on dispersion, the model is not over dispersed as the p-value does not break the null hypothesis.  
+
+**Diagnostics Plot:**  
+Like the Poisson models, the negative binomial models display deviation from the qq-plot. The zero-inflation test also confirms model fit inadequacy due to zero inflation.
 ```{r echo=FALSE}
-nbfit1<-glm.nb(TARGET~ STARS+ LabelAppeal  + pH +TotalSulfurDioxide +  FreeSulfurDioxide+ Sulphates + Chlorides + AcidIndex + VolatileAcidity,data=train.clean)
+nbfit1<-glm.nb(TARGET~ log(STARS)+ LabelAppeal  + pH +TotalSulfurDioxide +  FreeSulfurDioxide+ Sulphates + Chlorides + AcidIndex + VolatileAcidity,data=train.clean)
 summary(nbfit1)
 
 #dispersion check
 odTest(nbfit1)
 ```
+```{r NB1-Residuals}
+#check residual plots
+res.sim3 <- simulateResiduals(nbfit1, n=250)
+plotSimulatedResiduals(res.sim3)
+
+#Check zero inflation test
+DHARMa::testZeroInflation(res.sim3) #p-value confirms zero-inflation if present in the model
+
+```
+
 
 
 #### Negative Binomial Model 2
 
 Building off the last model, the team could see if the features STARS and AcidIndex have a effect on the deviance. From the distribution plots, those features distribution are slightly right-skewed. This model will use the same subset of features but log transform STARS and AcidIndex. This change lowered the null deviance by 496 pts. This improvement in the model caused the STARS's coefficient to increased to (7.36e-01), which points out the feature has a stronger influence in more wine cases sold like the wine's sulfur dioxide content.
+
 
 ```{r echo=FALSE}
 nbfit2<-glm.nb(TARGET ~ log(STARS) + LabelAppeal + pH + TotalSulfurDioxide +FreeSulfurDioxide + Sulphates + Chlorides + log(AcidIndex) + VolatileAcidity,data=train.clean)
@@ -228,14 +285,33 @@ summary(nbfit2)
 odTest(nbfit2)
 ```
 
+```{r NB2-Residuals, eval=FALSE, include=FALSE}
+#check residual plots
+res.sim4 <- simulateResiduals(nbfit2, n=250)
+plotSimulatedResiduals(res.sim4)
+
+#Check zero inflation test
+DHARMa::testZeroInflation(res.sim4) #p-value confirms zero-inflation if present in the model
+
+```
+
 
 #### Multiple Linear Model 1
 
 The team revisited linear regression with the current optimal subset of features. Surprisingly, the significance change with this regression model. STARS and AcidIndex coefficients also doubled in the this regression model. Although this model's explains 46% of the total variance, it might be in the best interest to re-examine the features any shifts towards significance in the next model.
 
+**Diagnostics Plots**  
+As expected, since we are dealing with count data, the Residuals vs fitted plot displays a pattern for both Multiple Linear Regression models. This is to be expected given that there is zero-inflation in the data. Better models like Poisson, Negative-Binomial or zero-inflated models are a better fit for the data.
+
 ```{r echo=FALSE}
 lm1<-lm(TARGET ~ log(STARS) + LabelAppeal + pH + TotalSulfurDioxide +FreeSulfurDioxide + Sulphates + Chlorides + log(AcidIndex) + VolatileAcidity,data=train.clean)
 summary(lm1)
+
+```
+
+```{r ML1-Residuals}
+par(mfrow = c(2, 2))
+plot(lm1)
 
 ```
 
@@ -252,6 +328,11 @@ summary(lm2)
 
 ```
 
+```{r ML2-Residuals}
+par(mfrow = c(2, 2))
+plot(lm2)
+
+```
 
 #### Bonus| zero-inflated Model
 
@@ -262,18 +343,31 @@ This model achieved the highest log-likelihood out of all the current models. Th
 Let's also make another zero inflated regression model with the linear model's subset of features. This model will be to compare the coefficients that best match the linear model and if these features work better with zero inflation.
 ```{r echo=FALSE}
 #using  zeroinfl() with nb's best features
-zerop1<-zeroinfl(TARGET ~ log(STARS) + LabelAppeal + pH + TotalSulfurDioxide +FreeSulfurDioxide + Sulphates + Chlorides + log(AcidIndex) + VolatileAcidity,data=train.clean)
+zerop1<-zeroinfl(TARGET ~ log(STARS) + LabelAppeal + pH + TotalSulfurDioxide +FreeSulfurDioxide + Sulphates + Chlorides + log(AcidIndex) + VolatileAcidity,data=train.clean, dist = "poisson")
 
 summary(zerop1)
 
 #second zero inflated model with lm's best features
 zerop2<-zeroinfl(TARGET ~ VolatileAcidity + CitricAcid + Chlorides + 
     FreeSulfurDioxide + TotalSulfurDioxide + Density + pH + Sulphates + 
-    Alcohol + LabelAppeal + log(AcidIndex) + log(STARS), data = train.clean)
+    Alcohol + LabelAppeal + log(AcidIndex) + log(STARS), data = train.clean, dist = "poisson")
 summary(zerop2)
 
 ```
 
+```{r ZI-Residuals}
+
+par(mfrow = c(1,2))
+
+residuals_zip = residuals(zerop1)
+plot(train.clean$TARGET, residuals_zip, xlab = "Observed Counts", ylab = "Residuals", main="zerop1")
+abline(h = 0, col = "red")
+
+residuals_zip = residuals(zerop2)
+plot(train.clean$TARGET, residuals_zip, xlab = "Observed Counts", ylab = "Residuals", main="zerop2")
+abline(h = 0, col = "red")
+
+```
 
 ### Select Models
 
@@ -283,7 +377,7 @@ For starters, the team can put aside the poisson models from the model compariso
 
 ####Battle of the models
 
-Looking at the first round of stats, the highest likelihood goes to zero inflated model two with a score of -21,048.24 with model one following behind. When it comes to the mc-fadden R^2, the linear model two has the highest R^2 of 0.15. For this round elimnation, the negative binomial models can be eliminated from the decision process.
+Looking at the first round of stats, the highest likelihood goes to zero inflated model two with a score of -21,048.24 with model one following behind. When it comes to the mc-fadden R^2, the linear model two has the highest R^2 of 0.15. For this round elimination, the negative binomial models can be eliminated from the decision process.
 
 ```{r echo=FALSE}
 #pull model statistics from the competing models
