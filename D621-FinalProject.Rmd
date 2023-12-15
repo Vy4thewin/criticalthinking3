@@ -2,7 +2,9 @@
 title: "final_project"
 author: "Jose Rodriguez, Vyanna Hill, Christian Uriostegui"
 date: "2023-12-09"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r Load-Libraries, include=FALSE}
@@ -48,7 +50,7 @@ date_val_cols <- c("Released", "Last.Updated")
 factor_list <- c("Category", "Content.Rating")
 
 app.data <- raw.app.data |>
-  dplyr::select(-c(ï..App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
+  dplyr::select(-c(App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
   mutate_at(blank_val_cols, ~na_if(., "")) |> #convert blank values to NA to be better handled by na.omit()
   na.omit()|> #drops 1577 observations (approx. 35 of the original dataset)
   mutate_at(factor_list, factor) |> #convert cols to factor type
@@ -219,6 +221,7 @@ The fourth version of the gam model adds the penalty to the model. There was not
 
 In the next model, the rating count smoothing was removed and editors choice, content rating, and last updated to the model. Although the R^2 dropped to 52%, the fitted vs actual plot appears more normal. Checking the AIC and a few other metrics, it does appear the fourth model has the advantage than the model with the higher log likelihood and lower deviance.
 
+
 ```{r} 
 #Increasing the basis functions in rating count and add extra penalty
 gam3<- gam(Rating ~s(Rating.Count,bs="cs",k=100) +
@@ -246,7 +249,59 @@ glance(gam4)
 ```{r}
 app.data%>%ggplot(aes(x=Rating,y=Rating.Count))+geom_histogram()
 app.data%>%ggplot(aes(x=Rating,y=Price))+geom_histogram()
-
-
 ```
+
+#### Improved model gam 3
+
+For model 3 we decided to increase the k value from 100 to 150 and 15 to 20 in an effort to see if it improved our metrics. 
+
+We observed improvements in key areas such as the logLik, AIC, and BIC. In addition, there is a lower deviance in the updated gam3 model.
+
+-----------------------------------------------------------------
+
+```{r}
+#Increased k folds to improve metrics
+gam3_update1<- gam(Rating ~s(Rating.Count,bs="cs",k=150) +
+                 s(Installs,bs="cs",k=20)+Category+Ad.Supported+In.App.Purchases+Price, data = app.data,method = "REML",select=TRUE)
+
+summary(gam3_update1)
+gam.check(gam3_update1)
+```
+
+```{r}
+summary(gam3)
+summary(gam3_update1)
+```
+
+```{r}
+glance(gam3)
+glance(gam3_update1)
+```
+
+To further support our decision making, we performed an anova test to decide which model to select.
+
+Looking at this side-by-side view, we observe important details. The updated gam3 uses more degrees of freedom (df), as indicated by the decrease in residual degrees of freedom, which indicates more complexity. As noted, the residuals are lower in the updated gam3 model which tell us that the model fits the data better. Lastly, the p-value indicates that the difference between the models is significant. This leads us to select 'gam3_update1' as our preferred model. 
+
+```{r}
+anova_result <- anova(gam3, gam3_update1, test="Chisq")
+print(anova_result)
+```
+
+
+#### Model Selection
+
+To finalize the selection of a model, we combined the summary statistics for easy comparison.
+
+Our updated model 3 performs the best. It has the lowest AIC, BIC and also has the highest Log-Likelihood. It also has the lowest deviance. Given the high performance of model 3, we will use this to perform our predictions.
+
+```{r}
+gam_model_comp <- bind_rows(glance(gam1), glance(gam2), glance(gam3_update1), glance(gam4))
+gam_names1 <- c("gam1","gam2","gam3","gam4")
+gam_model_comp <- cbind(model.build = gam_names1, gam_model_comp)
+gam_model_comp
+```
+
+
+
+#### Predictions
 
