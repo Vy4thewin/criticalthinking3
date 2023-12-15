@@ -50,7 +50,7 @@ date_val_cols <- c("Released", "Last.Updated")
 factor_list <- c("Category", "Content.Rating")
 
 app.data <- raw.app.data |>
-  dplyr::select(-c(App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
+  dplyr::select(-c(ï..App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
   mutate_at(blank_val_cols, ~na_if(., "")) |> #convert blank values to NA to be better handled by na.omit()
   na.omit()|> #drops 1577 observations (approx. 35 of the original dataset)
   mutate_at(factor_list, factor) |> #convert cols to factor type
@@ -150,6 +150,13 @@ numeric.data <- app.data %>%
 
 corrplot(cor(numeric.data),method = "number",type="lower", tl.srt = .71,number.cex=0.75)
 
+
+#Setting a 70/30 split of the app.store
+library(caTools)
+temp<-sample.split(app.data$Rating,SplitRatio =0.7)
+app.store.train<-subset(app.data,sample=TRUE)
+app.store.test<-subset(app.data,sample=FALSE)
+
 ```
 
 ### Testing GAM Modeling
@@ -176,7 +183,7 @@ gam.mod <- gam(Rating ~  Category +
                  #Ad.Supported + 
                  #In.App.Purchases +
                  #Editors.Choice
-               , data = app.data)
+               , data = app.store.train)
 
 summary(gam.mod)
 par(mfrow = c(2, 2)) 
@@ -199,7 +206,7 @@ In the third iteration, the team added more bases to the smoothing function. For
 #reviewing previous model, apply cubic splines and updating method to reml
 gam1<- gam(Rating ~s(Rating.Count,bs ='cs') +
                  s(Installs,bs ='cs')+Category+Ad.Supported+In.App.Purchases
-               , data = app.data,method = "REML")
+               , data = app.store.train,method = "REML")
 
 summary(gam1)
 par(mfrow = c(2, 2)) 
@@ -211,7 +218,7 @@ gam.check(gam1)
 
 #Increasing the basis functions in the smoothing items
 gam2<- gam(Rating ~s(Rating.Count,bs="cs",k=100) +
-                 s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases, data = app.data,method = "REML")
+                 s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases, data = app.store.train,method = "REML")
 summary(gam2)
 gam.check(gam2)
 ```
@@ -225,13 +232,13 @@ In the next model, the rating count smoothing was removed and editors choice, co
 ```{r} 
 #Increasing the basis functions in rating count and add extra penalty
 gam3<- gam(Rating ~s(Rating.Count,bs="cs",k=100) +
-                 s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases+Price, data = app.data,method = "REML",select=TRUE)
+                 s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases+Price, data = app.store.train,method = "REML",select=TRUE)
 
 summary(gam3)
 gam.check(gam3)
 
 #remove smoothing on rating count and add in editors choice
-gam4<- gam(Rating ~Rating.Count+s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases+Editors.Choice+Content.Rating+Last.Updated, data = app.data,method = "REML")
+gam4<- gam(Rating ~Rating.Count+s(Installs,bs="cs",k=15)+Category+Ad.Supported+In.App.Purchases+Editors.Choice+Content.Rating+Last.Updated, data = app.store.train,method = "REML")
 summary(gam4)
 gam.check(gam4)
 
@@ -245,12 +252,6 @@ glance(gam4)
 ```
 
 
-
-```{r}
-app.data%>%ggplot(aes(x=Rating,y=Rating.Count))+geom_histogram()
-app.data%>%ggplot(aes(x=Rating,y=Price))+geom_histogram()
-```
-
 #### Improved model gam 3
 
 For model 3 we decided to increase the k value from 100 to 150 and 15 to 20 in an effort to see if it improved our metrics. 
@@ -262,7 +263,7 @@ We observed improvements in key areas such as the logLik, AIC, and BIC. In addit
 ```{r}
 #Increased k folds to improve metrics
 gam3_update1<- gam(Rating ~s(Rating.Count,bs="cs",k=150) +
-                 s(Installs,bs="cs",k=20)+Category+Ad.Supported+In.App.Purchases+Price, data = app.data,method = "REML",select=TRUE)
+                 s(Installs,bs="cs",k=20)+Category+Ad.Supported+In.App.Purchases+Price, data = app.store.train,method = "REML",select=TRUE)
 
 summary(gam3_update1)
 gam.check(gam3_update1)
@@ -276,6 +277,11 @@ summary(gam3_update1)
 ```{r}
 glance(gam3)
 glance(gam3_update1)
+gam.check(gam3_update1)
+
+#plot model fit
+par(c(5,5))
+plot.gam(gam3_update1)
 ```
 
 To further support our decision making, we performed an anova test to decide which model to select.
@@ -301,7 +307,55 @@ gam_model_comp <- cbind(model.build = gam_names1, gam_model_comp)
 gam_model_comp
 ```
 
+#### Variable Importance
+
+From the final model, the team reviewed the current collection of features and their coefficients in the regression model. Ad.SupportedTRUE, CategoryArcade, CategoryBooks & Reference, and CategoryBusiness were identified as statistically significant in the regression model.
+
+The feature of ad supported is not a surprise as Wondwesen (2023) saw ad supported ads were more likely to have lower rating compared to the paid version in the app store.
+
+```{r echo=FALSE}
+#look at features with significant p-values
+summary.gam(gam3_update1)
+```
+
+#### Predictions of the final model
 
 
-#### Predictions
+The final model gam model will use the test data set in its predictions. In the predictions seen below, the team examined the predicted values of the predictions versus the actual values in the data set. The team noticed that none of the predicted values fall outside the confidence interval.
 
+Looking at the fit of the regression model, the team noticed rating count had a larger confidence interval compared to installs. The spline of rating count shows there's still a large variance with its splines compared to installs. This could signify that rating count may need additional support in its spline creation.
+
+```{r echo=FALSE}
+#predicting the ratings with the most updated
+gam_predict<-predict(gam3_update1,newdata = app.store.test,se.fit = TRUE,type="response")
+
+#Take the upper and lower bounds of the confidence interval
+upper<-gam_predict$fit+1.96*gam_predict$se.fit
+lower<-gam_predict$fit-1.96*gam_predict$se.fit
+
+#store results
+test.results<-data.frame(
+    pred<-gam_predict,
+    fit<-gam_predict$fit,
+    upper<-upper,
+    lower<-lower,
+    act<-app.store.test$Rating
+)
+#Show head of the table
+test.results<-test.results%>%rename(pred=fit,upper.bound="upper....upper",lower.bound="lower....lower",actual="act....app.store.test.Rating",fit="fit....gam_predict.fit")
+
+#check that prediction is within the confidence level
+test.results<-test.results%>%mutate(is.conf=if_else(pred>=lower.bound && pred<=upper.bound,0,1 ))
+
+#view count of observation outside confidence level
+table(test.results$is.conf)
+
+# #see model fit
+# test.results%>%ggplot(aes(x=act,y=pred))+geom_ribbon(aes(ymin=lower,ymax=upper,fill="lightblue"))+geom_line()
+par(c(5,5))
+plot.gam(gam3_update1)
+
+#review results of prediction
+as_tibble(head(test.results))
+
+```
