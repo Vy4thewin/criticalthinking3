@@ -378,7 +378,7 @@ test.results<-data.frame(
 test.results<-test.results%>%rename(pred=fit,upper.bound="upper....upper",lower.bound="lower....lower",actual="act....app.store.test.Rating",fit="fit....gam_predict.fit")
 
 #check that prediction is within the confidence level
-test.results<-test.results%>%mutate(is.conf=if_else(pred>=lower.bound && pred<=upper.bound,0,1 ))
+test.results<-test.results%>%mutate(is.conf=if_else(pred>=lower.bound & pred<=upper.bound,0,1 ))
 
 #view count of observation outside confidence level
 table(test.results$is.conf)
