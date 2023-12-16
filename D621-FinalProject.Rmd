@@ -9,6 +9,10 @@ output:
 
 
 ### Abstract
+|  For app developers, their app performance in the app store accounts for future funding for new projects. This project reviewed linear regression and its accuracy towards its predictions in an app’s rating in the Google App Store. In the first path of the project, the team reviewed the Google App Store data set for its viability in linear regression as the response feature is continuous and not discrete for count regression. After a review of the data set’s non-normality and model performance, the project’s regression scope expanded toward generalized additive modeling (GAM). 
+
+|  The team created four different GAMs models with various splines on the features. The splines help better fit the highly skewed features of rating count and stars, as the increased knots on the features boosted the R^2 20%+. This exploration of the different types of splines resulted in the third model with the closest fit with an R^2 of 96%, a deviance of 669, and an RSME of 15%. The final model’s performance highlighted a need for smoothing with a non-normal data set with a continuous response.
+
 
 ### Keywords 
 
@@ -78,7 +82,7 @@ date_val_cols <- c("Released", "Last.Updated")
 factor_list <- c("Category", "Content.Rating")
 
 app.data <- raw.app.data |>
-  dplyr::select(-c(App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
+  dplyr::select(-c(ï..App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
   mutate_at(blank_val_cols, ~na_if(., "")) |> #convert blank values to NA to be better handled by na.omit()
   na.omit()|> #drops 1577 observations (approx. 35 of the original dataset)
   mutate_at(factor_list, factor) |> #convert cols to factor type
@@ -391,12 +395,16 @@ plot.gam(gam3_update1)
 
 #review results of prediction
 as_tibble(head(test.results))
+
+#calculate RSME
+rsme<-sqrt(mean((test.results$pred - test.results$act)^2))
+sprintf("RSME of Model 3 is: %1.3f",rsme)
 ```
 
 
 ### Final Thoughts
 
-|  The results of the data set highlighted the importance of generalized additive model in regression. The regression model better fit the data set as the features do not follow the assumption of normality like linear regression. The winning GAM models provided a regression model with a R^2 of 96% and a the lowest deviance of 669. The model's current results could be improved through a different method of splines as the summary results do highlight the need of more knots in the spline function.
+|  The results of the data set highlighted the importance of generalized additive model in regression. The regression model better fit the data set as the features do not follow the assumption of normality like linear regression. The winning GAM models provided a regression model with a R^2 of 96%, a RSME of 15%, and a the lowest deviance of 669. The model's current results could be improved through a different method of splines as the summary results do highlight the need of more knots in the spline function.
 
 
 ### References
