@@ -55,10 +55,10 @@ raw.app.data <-read.csv(data_url)
 
 #### Data Preprocessing
 
-###### Data Subset 
+###### **Data Subset** 
 |  The data was pre-processed using the tidyverse package. First, a column subset was taken which yielded a total of 18 variables: 17 of those being predictors (x) and one target variable (y). The target variable, also known as the response variable, is 'Rating'. 'This column 'Rating' contains the accumulated average score of a given app between 0 and 5 stars.
 
-###### Missing data 
+###### **Missing data** 
 
 |  Missing data was handled by removing NA values. Two reasons prompted the omission of missing values: 1) removing missing values only removed about 5% of observations, 2) It is not known if the missing data points are missing completely at random (MCAR), hence imputation could introduce bias to the model.
 
@@ -78,7 +78,7 @@ date_val_cols <- c("Released", "Last.Updated")
 factor_list <- c("Category", "Content.Rating")
 
 app.data <- raw.app.data |>
-  dplyr::select(-c(ï..App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
+  dplyr::select(-c(App.Name, App.Id, Developer.Id, Developer.Website, Developer.Email, Privacy.Policy, Scraped.Time, Currency)) |>
   mutate_at(blank_val_cols, ~na_if(., "")) |> #convert blank values to NA to be better handled by na.omit()
   na.omit()|> #drops 1577 observations (approx. 35 of the original dataset)
   mutate_at(factor_list, factor) |> #convert cols to factor type
@@ -93,7 +93,7 @@ app.data <- raw.app.data |>
 #### Data Exploration
 
 
-```{r Checking Variable Distribution, echo=FALSE}
+```{r Checking Variable Distribution, echo=FALSE, warning=FALSE}
 library(ggpubr)
 
 plot.func <- function(data, col){
@@ -124,7 +124,7 @@ plt <- ggarrange(g1,g2,g3,g4,g5,g6,g7,ncol =3, nrow = 3)
 plt
 ```
 
-###### Distribution of Numeric Variables:  
+###### **Distribution of Numeric Variables:**  
 | All numerical variables were found to be highly skewed. Transformations such as box-cox, logarithmic and square-root were explored. However, they did not normalize the data. Consequently, several assumptions are violated: 1) Normality, 2) linearity. Ultimately, this leads to assuming that the data exhibits complex relationships where a Nonparametric Regression could be the best choice. 
 
 
@@ -166,14 +166,14 @@ app.data <- app.data%>%mutate(Rating.Count=sqrt(Rating.Count+1))
 # plot(var.dist.plt)
 ```
 
-###### Categorial Variables:  
-| Categorical variables can easily be handled by most R modeling functions. As a caveat some of modeling functions require categorical predictors to be of class factor. During the dplyr data wrangling segment, all categorical variables were converted to factor type using a list.
+###### **Categorial Variables:**  
+| Categorical variables can easily be handled by most R modeling functions. As a caveat, some modeling functions require categorical predictors to be of class factor. During the dplyr data wrangling segment, all categorical variables were converted to factor type using a list.
 
 
-###### Checking for Multi-Collinearity:  
+###### **Checking for Multi-Collinearity:**  
 |'Maximum.Installs' and 'Minimum.Installs' were found to be highly correlated to 'Installs'.
 
-```{r echo=FALSE}
+```{r echo=FALSE, warning=FALSE}
 library(corrplot)
 #checking for highly correlated variables
 numeric.data <- app.data %>%
@@ -192,13 +192,13 @@ app.store.test<-subset(app.data,sample=FALSE)
 
 #### Model Building 
 
-##### Testing GAM Modeling
+##### **Testing GAM Modeling:**
 
 |  The team decided to shift the focus from linear models towards Generalized Additive Models (GAM), as the previous linear model attempts produced poor results. In the first model below, the R^2 value increase to 30% with 30% of the deviance accounted. This improvement in the results shows GAM may be a better regression model for fitting the data provided.
 
 The team did notice the R^2 increase with a smoothing function on Rating count. Rating count distribution is highly skewed,as many cases are below <10. The smoothing function provided additional support in shifting the best fit around the feature to a better angle.
 
-```{r Testing NonParametric Model, echo=FALSE}
+```{r Testing NonParametric Model, echo=FALSE, warning=FALSE}
 library(mgcv)
 
 gam.mod <- gam(Rating ~  Category + 
@@ -227,9 +227,9 @@ gam.check(gam.mod)
 ```
 
 
-##### Introducing shrinking and other smoothing techinques
+##### **Introducing shrinking and other smoothing techinques:**
 
-| From the data exploration, the team is aware of the non-linearity of the features in the data set. The current features may not have a linear fit, but its best fit shape can be a polynomial. Using splines, its adjusting the the line with penalties towards mse; which makes the shape more linear. In order to capture the majority of the points in the data set, the best fit line may take the shape of different curves to better fit the response Rating. The team use shrinking smoothed in the features provided as it lessens the penalty.
+| From the data exploration, the team is aware of the non-linearity of the features in the data set. The current features may not have a linear fit, but its best fit shape can be a polynomial. Using splines, its adjusting the the line with penalties towards mse; which makes the shape more linear. In order to capture the majority of the points in the data set, the best fit line may take the shape of different curves to better fit the response Rating. The team used shrinking smoothed in the features provided as it lessens the penalty.
 
 | For the models below, the team use splines with a mix of basis. In addition, the method REML (Restricted Maximum Likelihood) was applied as the model has random effects in the features .For Model two, the cubic spline is applied for the features Installs and Rating.counts. These additional splines boosted the R^2 of the model to 72% with its deviance at 72%. In the plots below, the splines of rating count have a closer fit onto the feature than the previous iteration. Checking the gam, the model did coverage with the terms provided. However, the p-values of the smoothed items are significant. This means the smoothing knots need to be increased as the number of bases are seeing a pattern in the model's residuals.
 
@@ -285,7 +285,7 @@ glance(gam4)
 ```
 
 
-##### Improved model gam 3
+##### **Improved model gam 3:**
 
 | For model 3 we decided to increase the k value from 100 to 150 and 15 to 20 in an effort to see if it improved our metrics. 
 
@@ -303,7 +303,7 @@ gam.check(gam3_update1)
 ```
 
 
-```{r}
+```{r warning=FALSE}
 glance(gam3)
 glance(gam3_update1)
 gam.check(gam3_update1)
@@ -340,7 +340,7 @@ gam_model_comp
 
 |  From the model selection, improved GAM model 3 was selected as the final model. The final model has the highest R^2 of 96%. This high R^2 does support the need of the spline on the variables "Rating.count" and "STARS", as the R^2 provided once the number of knots increased on these features splines. The team wanted to see if these features are of high importance in the model, so the coefficients were reviewed below.
 
-##### Variable Importance
+##### **Variable Importance:**
 
 |  From the final model, the team reviewed the current collection of features and their coefficients in the regression model. Ad.SupportedTRUE, CategoryArcade, CategoryBooks & Reference, and CategoryBusiness were identified as statistically significant in the regression model.
 
@@ -351,14 +351,14 @@ The feature of ad supported is not a surprise as Wondwesen (2023) saw ad support
 summary.gam(gam3_update1)
 ```
 
-#### Predictions of the final model
+#### Predictions of The Final Model
 
 
 |  In the predictions seen below, the team examined the predicted values of the predictions versus the actual values in the data set. The team noticed that none of the predicted values fall outside the confidence interval.
 
 Looking at the fit of the regression model, the team noticed rating count had a larger confidence interval compared to installs. The spline of rating count shows there's still a large variance with its splines compared to installs. This could signify that rating count may need additional support in its spline creation.
 
-```{r echo=FALSE}
+```{r echo=FALSE, warning=FALSE}
 #predicting the ratings with the most updated
 gam_predict<-predict(gam3_update1,newdata = app.store.test,se.fit = TRUE,type="response")
 
@@ -378,7 +378,8 @@ test.results<-data.frame(
 test.results<-test.results%>%rename(pred=fit,upper.bound="upper....upper",lower.bound="lower....lower",actual="act....app.store.test.Rating",fit="fit....gam_predict.fit")
 
 #check that prediction is within the confidence level
-test.results<-test.results%>%mutate(is.conf=if_else(pred>=lower.bound & pred<=upper.bound,0,1 ))
+test.results<-test.results%>%
+  mutate(is.conf=if_else(pred>=lower.bound & pred<=upper.bound,0,1 ))
 
 #view count of observation outside confidence level
 table(test.results$is.conf)
